@@ -1,0 +1,11 @@
+# Default notification policy: route all alerts to Discord (infrawatch-discord).
+# Receiver name must match the contact point name in contact_points.yaml.
+apiVersion: 1
+
+policies:
+  - orgId: 1
+    receiver: infrawatch-discord
+    group_by: ["alertname", "service"]
+    group_wait: 30s
+    group_interval: 5m
+    repeat_interval: 4h
