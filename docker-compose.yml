@@ -1,0 +1,91 @@
+services:
+  # --- Simulated microservices ---
+  api-gateway:
+    build: services/api-gateway
+    ports:
+      - "8080:8000"
+    networks:
+      - infrawatch
+
+  payment-service:
+    build: services/payment-service
+    ports:
+      - "8001:8001"
+    networks:
+      - infrawatch
+
+  user-service:
+    build: services/user-service
+    ports:
+      - "8002:8002"
+    networks:
+      - infrawatch
+
+  order-service:
+    build: services/order-service
+    ports:
+      - "8003:8003"
+    networks:
+      - infrawatch
+
+  redis-cache:
+    build: services/redis-cache
+    ports:
+      - "8004:8004"
+    networks:
+      - infrawatch
+
+  # --- Infrastructure ---
+  prometheus:
+    image: prom/prometheus:v2.53.0
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    ports:
+      - "9090:9090"
+    networks:
+      - infrawatch
+    depends_on:
+      - api-gateway
+      - payment-service
+      - user-service
+      - order-service
+      - redis-cache
+
+  grafana:
+    image: grafana/grafana:11.1.0
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=infrawatch
+      - GF_USERS_ALLOW_SIGN_UP=false
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - grafana-data:/var/lib/grafana
+    ports:
+      - "3000:3000"
+    networks:
+      - infrawatch
+    depends_on:
+      - prometheus
+
+  neo4j:
+    image: neo4j:5.21-community
+    environment:
+      - NEO4J_AUTH=neo4j/infrawatch
+      - NEO4J_PLUGINS=["apoc"]
+    volumes:
+      - neo4j-data:/data
+    ports:
+      - "7474:7474"
+      - "7687:7687"
+    networks:
+      - infrawatch
+
+volumes:
+  prometheus-data:
+  grafana-data:
+  neo4j-data:
+
+networks:
+  infrawatch:
+    driver: bridge
