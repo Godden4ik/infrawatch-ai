@@ -52,7 +52,7 @@ gh pr create
 
 ```
 services/      # Simulated microservices emitting Prometheus metrics  ✅ DONE
-mcp-servers/   # Three MCP servers: Grafana, Prometheus, Neo4j        🔲 TODO
+mcp-servers/   # Three MCP servers: Grafana, Prometheus, Neo4j        ✅ DONE
 agents/        # Three agents: Monitor, Analyst, Responder             🔲 TODO
 graph/         # Neo4j schemas, seed data, GraphRAG pipeline          ✅ DONE (seed)
 ui/            # Streamlit dashboard                                   🔲 TODO
@@ -78,9 +78,9 @@ Each MCP server exposes domain-specific tools to agents:
 
 | Server | Tools |
 |--------|-------|
-| Grafana MCP | query dashboards, read panels, list alerts |
-| Prometheus MCP | execute PromQL, fetch time ranges |
-| Neo4j MCP | run Cypher queries, traverse service dependencies |
+| Prometheus MCP (`mcp-servers/prometheus_mcp/server.py`) | `execute_promql`, `list_metrics`, `get_targets` |
+| Grafana MCP (`mcp-servers/grafana_mcp/server.py`) | `list_dashboards`, `get_dashboard`, `get_panel`, `list_alerts` |
+| Neo4j MCP (`mcp-servers/neo4j_mcp/server.py`) | `run_cypher`, `get_service_dependencies`, `get_blast_radius` |
 
 ### GraphRAG vs Naive RAG
 
@@ -91,7 +91,7 @@ A key deliverable is demonstrating GraphRAG superiority for topology-dependent q
 | Phase | Description | Status |
 |-------|-------------|--------|
 | Phase 1 | Docker Compose + simulated services + tests | ✅ Complete |
-| Phase 2 | MCP servers (Grafana, Prometheus, Neo4j) | 🔲 Next |
+| Phase 2 | MCP servers (Grafana, Prometheus, Neo4j) | ✅ Complete |
 | Phase 3 | LangGraph agent pipeline | 🔲 TODO |
 | Phase 4 | GraphRAG pipeline + runbook ingestion | 🔲 TODO |
 | Phase 5 | Streamlit UI + demo scenarios | 🔲 TODO |
@@ -113,6 +113,20 @@ A key deliverable is demonstrating GraphRAG superiority for topology-dependent q
 | Agent Orchestration (LangGraph, agent specialization) | 20% |
 | Documentation | 10% |
 | Presentation & Demo | 10% |
+
+## MCP Server Environment Variables
+
+| Variable | Default | Used by |
+|----------|---------|---------|
+| `PROMETHEUS_URL` | `http://localhost:9090` | Prometheus MCP |
+| `GRAFANA_URL` | `http://localhost:3000` | Grafana MCP |
+| `GRAFANA_USER` | `admin` | Grafana MCP |
+| `GRAFANA_PASSWORD` | `infrawatch` | Grafana MCP |
+| `NEO4J_URI` | `bolt://localhost:7687` | Neo4j MCP |
+| `NEO4J_USER` | `neo4j` | Neo4j MCP |
+| `NEO4J_PASSWORD` | `infrawatch` | Neo4j MCP |
+
+MCP servers use stdio transport — agents invoke them as subprocesses.
 
 ## Service Ports (local)
 
