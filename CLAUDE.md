@@ -8,22 +8,42 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Tech Stack
 
-- **Language**: Python
+- **Language**: Python 3.12+
 - **AI/Orchestration**: LangChain, LangGraph, OpenAI API
 - **Monitoring**: Prometheus, Grafana
 - **Graph Database**: Neo4j (topology store + GraphRAG)
 - **Infrastructure**: Docker, Docker Compose
 - **Frontend**: Streamlit (or React for advanced)
-- **Testing**: pytest
+- **Testing**: pytest, pytest-asyncio, httpx
 
-## Expected Commands (once implemented)
+## Commands
 
 ```bash
 docker compose up          # Deploy full stack (Prometheus, Grafana, Neo4j, services)
-pytest                     # Run all tests
-pytest tests/unit/         # Unit tests only
-pytest tests/integration/  # Integration tests
-pytest tests/e2e/          # End-to-end scenario tests
+python graph/seed.py       # Seed Neo4j topology (run once after compose up)
+
+pytest tests/unit/         # Unit tests — no services needed
+pytest tests/integration/  # Integration tests — requires docker compose up
+pytest tests/e2e/          # End-to-end scenario tests — requires docker compose up
+pytest                     # All tests
+
+python scripts/inject_anomaly.py cascade        # Inject cascade failure scenario
+python scripts/inject_anomaly.py reset          # Clear all anomalies
+python scripts/inject_anomaly.py latency payment-service  # Inject on specific service
+```
+
+## Package Management
+
+Use `pip3 install <pkg> --break-system-packages` to install Python packages.
+
+## Git Workflow
+
+All new work goes on a feature branch and is merged via pull request — never commit directly to `master`.
+
+```bash
+git checkout -b feature/<name>
+# ... make changes ...
+gh pr create
 ```
 
 ## Architecture
@@ -31,12 +51,13 @@ pytest tests/e2e/          # End-to-end scenario tests
 ### Repository Layout
 
 ```
-services/      # Simulated microservices emitting Prometheus metrics
-mcp-servers/   # Three MCP servers: Grafana, Prometheus, Neo4j
-agents/        # Three agents: Monitor, Analyst, Responder
-graph/         # Neo4j schemas, seed data, GraphRAG pipeline
-ui/            # Streamlit dashboard
-tests/         # unit/, integration/, e2e/
+services/      # Simulated microservices emitting Prometheus metrics  ✅ DONE
+mcp-servers/   # Three MCP servers: Grafana, Prometheus, Neo4j        🔲 TODO
+agents/        # Three agents: Monitor, Analyst, Responder             🔲 TODO
+graph/         # Neo4j schemas, seed data, GraphRAG pipeline          ✅ DONE (seed)
+ui/            # Streamlit dashboard                                   🔲 TODO
+tests/         # unit/ ✅  integration/ ✅  e2e/ ✅
+scripts/       # inject_anomaly.py — anomaly injection CLI             ✅ DONE
 ```
 
 ### Agent Pipeline
@@ -65,6 +86,16 @@ Each MCP server exposes domain-specific tools to agents:
 
 A key deliverable is demonstrating GraphRAG superiority for topology-dependent queries (e.g., blast radius analysis). Runbooks and incident reports are ingested into Neo4j alongside the infrastructure topology graph.
 
+## Phase Status
+
+| Phase | Description | Status |
+|-------|-------------|--------|
+| Phase 1 | Docker Compose + simulated services + tests | ✅ Complete |
+| Phase 2 | MCP servers (Grafana, Prometheus, Neo4j) | 🔲 Next |
+| Phase 3 | LangGraph agent pipeline | 🔲 TODO |
+| Phase 4 | GraphRAG pipeline + runbook ingestion | 🔲 TODO |
+| Phase 5 | Streamlit UI + demo scenarios | 🔲 TODO |
+
 ## Key Scenarios to Implement
 
 1. Anomaly Detection — real-time cross-service health check
@@ -83,6 +114,16 @@ A key deliverable is demonstrating GraphRAG superiority for topology-dependent q
 | Documentation | 10% |
 | Presentation & Demo | 10% |
 
-## Development Priorities
+## Service Ports (local)
 
-Start with Phase 1 (Docker Compose + simulated services) before building the MCP/agent layer. Design MCP tool schemas before implementing agents — the interface contract determines agent capability. Build the anomaly injection framework early so all scenarios can be tested realistically.
+| Service | Port |
+|---------|------|
+| api-gateway | 8080 |
+| payment-service | 8001 |
+| user-service | 8002 |
+| order-service | 8003 |
+| redis-cache | 8004 |
+| Prometheus | 9090 |
+| Grafana | 3000 (admin / infrawatch) |
+| Neo4j HTTP | 7474 (neo4j / infrawatch) |
+| Neo4j Bolt | 7687 |
