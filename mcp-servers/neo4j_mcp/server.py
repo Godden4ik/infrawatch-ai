@@ -84,16 +84,17 @@ async def get_service_dependencies(
 
     `max_depth`: maximum hops to traverse (default 3).
     """
+    depth = int(max_depth)
     if direction == "downstream":
         cypher = (
-            "MATCH path = (s:Service {name: $name})-[*1..$depth]->(t:Service) "
+            f"MATCH path = (s:Service {{name: $name}})-[*1..{depth}]->(t:Service) "
             "RETURN [n IN nodes(path) | n.name] AS services, "
             "[r IN relationships(path) | type(r)] AS relationships, "
             "length(path) AS depth"
         )
     elif direction == "upstream":
         cypher = (
-            "MATCH path = (t:Service)-[*1..$depth]->(s:Service {name: $name}) "
+            f"MATCH path = (t:Service)-[*1..{depth}]->(s:Service {{name: $name}}) "
             "RETURN [n IN nodes(path) | n.name] AS services, "
             "[r IN relationships(path) | type(r)] AS relationships, "
             "length(path) AS depth"
@@ -104,7 +105,7 @@ async def get_service_dependencies(
     driver = _get_driver()
     try:
         async with driver.session() as session:
-            result = await session.run(cypher, name=service_name, depth=max_depth)
+            result = await session.run(cypher, name=service_name)
             records = [_serialize_record(r) async for r in result]
             return json.dumps(records, indent=2)
     except Exception as e:
