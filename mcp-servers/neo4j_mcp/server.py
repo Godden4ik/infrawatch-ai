@@ -21,14 +21,8 @@ mcp = FastMCP(
     ),
 )
 
-_driver = None
-
-
-def _get_driver():
-    global _driver
-    if _driver is None:
-        _driver = AsyncGraphDatabase.driver(NEO4J_URI, auth=(NEO4J_USER, NEO4J_PASSWORD))
-    return _driver
+def _make_driver():
+    return AsyncGraphDatabase.driver(NEO4J_URI, auth=(NEO4J_USER, NEO4J_PASSWORD))
 
 
 def _serialize_value(value):
@@ -53,7 +47,7 @@ async def run_cypher(query: str, params: str | None = None) -> str:
 
     `params` is an optional JSON string of query parameters, e.g. '{"name": "redis-cache"}'.
     """
-    driver = _get_driver()
+    driver = _make_driver()
     parsed_params = {}
     if params:
         try:
@@ -102,7 +96,7 @@ async def get_service_dependencies(
     else:
         return json.dumps({"error": f"Invalid direction '{direction}', use 'downstream' or 'upstream'"})
 
-    driver = _get_driver()
+    driver = _make_driver()
     try:
         async with driver.session() as session:
             result = await session.run(cypher, name=service_name)
@@ -132,7 +126,7 @@ async def get_blast_radius(service_name: str) -> str:
         "depth "
         "ORDER BY depth"
     )
-    driver = _get_driver()
+    driver = _make_driver()
     try:
         async with driver.session() as session:
             result = await session.run(cypher, name=service_name)

@@ -100,8 +100,8 @@ def test_cascade_failure_affects_multiple_services(client):
         assert float(gw_results[0]["value"][1]) > 0.20
 
         # Redis memory usage should be climbing — just verify metric exists and > 0
-        redis_results = promql(client, "cache_memory_used_bytes")
-        assert redis_results, "No cache_memory_used_bytes metric found"
+        redis_results = promql(client, "redis_memory_used_bytes")
+        assert redis_results, "No redis_memory_used_bytes metric found"
         assert float(redis_results[0]["value"][1]) > 0
 
     finally:
