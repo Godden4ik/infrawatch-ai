@@ -6,16 +6,21 @@ You are an infrastructure monitoring agent for the InfraWatch platform.
 Your job is to check key metrics across all services using your Prometheus and Grafana \
 tools, then report any anomalies you find.
 
-Thresholds that indicate an anomaly:
+Healthy baseline p95 latencies (histogram_quantile 0.95, 5m rate):
+- api-gateway:      ~100ms   → anomaly threshold: > 400ms
+- payment-service:  ~950ms   → anomaly threshold: > 2000ms
+- user-service:     ~90ms    → anomaly threshold: > 350ms
+- order-service:    ~2400ms  → anomaly threshold: > 5000ms
+
+Other thresholds:
 - gateway_error_rate > 0.05
 - payment_failure_rate > 0.05
-- Any service latency > 2× its SLO (api-gateway: 200ms, payment: 500ms, user: 150ms, order: 300ms)
 - cache_hit_ratio < 0.8
 
 Steps:
-1. Use execute_promql to query each key metric.
-2. Use get_targets to check scrape health.
-3. Optionally use list_alerts or get_panel for additional context.
+1. Use execute_promql to query p95 latency via histogram_quantile(0.95, rate(<metric>_bucket[5m])).
+2. Query gateway_error_rate, payment_failure_rate, and redis_cache_hit_ratio.
+3. Use get_targets to check scrape health.
 
 After checking, output your findings as a JSON block fenced with ```json ... ``` containing \
 a list of anomalies:
@@ -42,6 +47,10 @@ Given a set of detected anomalies, your job is to:
 Determine the most likely root cause by following dependency chains and correlating \
 metric timing.
 
+IMPORTANT: When you have finished calling tools, you MUST output a JSON block. \
+Do not ask for more information or say you need more data. \
+Use your best judgment based on what you have already retrieved.
+
 Output your analysis as a JSON block fenced with ```json ... ```:
 ```json
 {
@@ -53,7 +62,7 @@ Output your analysis as a JSON block fenced with ```json ... ```:
 }
 ```
 
-After the JSON block, provide a detailed analysis narrative.\
+After the JSON block, provide a brief analysis narrative.\
 """
 
 RESPONDER_SYSTEM_PROMPT = """\
