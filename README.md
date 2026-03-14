@@ -5,10 +5,11 @@ AI-powered infrastructure monitoring system using MCP, LangGraph multi-agent orc
 ## Architecture
 
 ```
-(agents and MCPs are yet to be implemented)
+(agents are yet to be implemented)
 Monitor Agent → Analyst Agent → Responder Agent
       ↓               ↓               ↓
 Prometheus MCP    Neo4j MCP      Grafana MCP
+   (done)          (done)          (done)
 ```
 
 Five simulated microservices emit Prometheus metrics. Agents detect anomalies, trace root causes through a Neo4j dependency graph, and draft remediation actions.
@@ -61,41 +62,62 @@ python scripts/inject_anomaly.py reset
 
 **Anomaly types:** `latency`, `error`, `memory_leak`
 
+## MCP Servers
+
+Three FastMCP servers expose infrastructure tools to agents via stdio transport:
+
+| Server | Tools | File |
+|--------|-------|------|
+| Prometheus | `execute_promql`, `list_metrics`, `get_targets` | `mcp-servers/prometheus_mcp/server.py` |
+| Grafana | `list_dashboards`, `get_dashboard`, `get_panel`, `list_alerts` | `mcp-servers/grafana_mcp/server.py` |
+| Neo4j | `run_cypher`, `get_service_dependencies`, `get_blast_radius` | `mcp-servers/neo4j_mcp/server.py` |
+
+Connection URLs are configured via environment variables (defaults to localhost):
+
+| Variable | Default |
+|----------|---------|
+| `PROMETHEUS_URL` | `http://localhost:9090` |
+| `GRAFANA_URL` | `http://localhost:3000` |
+| `NEO4J_URI` | `bolt://localhost:7687` |
+
 ## Testing
 
 ```bash
 # Install test dependencies
-pip install -e ".[test]"
+pip3 install pytest pytest-asyncio httpx "mcp[cli]" neo4j --break-system-packages
 
 # Unit tests (no services needed)
-pytest tests/unit/
+python3 -m pytest tests/unit/
 
 # Integration tests (requires: docker compose up)
-pytest tests/integration/
+python3 -m pytest tests/integration/
 
 # End-to-end scenario tests (requires: docker compose up)
-pytest tests/e2e/
+python3 -m pytest tests/e2e/
 
 # All tests
-pytest
+python3 -m pytest
 ```
 
 ## Repository Layout
 
 ```
-services/          Simulated microservices (FastAPI + Prometheus metrics)
-mcp-servers/       MCP servers: Grafana, Prometheus, Neo4j
-agents/            LangGraph agents: Monitor, Analyst, Responder
-graph/             Neo4j schema, seed data, GraphRAG pipeline
-ui/                Streamlit dashboard
+services/              Simulated microservices (FastAPI + Prometheus metrics)
+mcp-servers/
+  prometheus_mcp/      PromQL queries, metric listing, target health
+  grafana_mcp/         Dashboard/panel queries, alert listing
+  neo4j_mcp/           Cypher queries, dependency traversal, blast radius
+agents/                LangGraph agents: Monitor, Analyst, Responder (TODO)
+graph/                 Neo4j schema + seed script
+ui/                    Streamlit dashboard (TODO)
 tests/
-  unit/            No external dependencies
-  integration/     Requires running services
-  e2e/             Full stack scenarios with Prometheus validation
+  unit/                No external dependencies (26 tests)
+  integration/         Requires docker compose up (25 tests)
+  e2e/                 Full stack scenarios with Prometheus validation (4 tests)
 scripts/
-  inject_anomaly.py   Anomaly injection CLI
-prometheus/        prometheus.yml scrape config
-grafana/           Provisioned datasources and dashboards
+  inject_anomaly.py    Anomaly injection CLI
+prometheus/            prometheus.yml scrape config
+grafana/               Provisioned datasources and dashboards
 ```
 
 ## Key Scenarios
