@@ -12,8 +12,13 @@ RESPONDER_TOOLS = {"get_blast_radius", "get_service_dependencies"}
 
 
 def create_mcp_client() -> MultiServerMCPClient:
-    """Create a MultiServerMCPClient for all MCP servers (use as async context manager)."""
+    """Create a MultiServerMCPClient for all MCP servers."""
     return MultiServerMCPClient(MCP_SERVERS)
+
+
+async def load_all_tools(client: MultiServerMCPClient) -> list[BaseTool]:
+    """Fetch all tools from all MCP servers (async, no context manager needed)."""
+    return await client.get_tools()
 
 
 def filter_tools(all_tools: list[BaseTool], names: set[str]) -> list[BaseTool]:
