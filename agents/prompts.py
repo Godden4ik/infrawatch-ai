@@ -15,7 +15,7 @@ Healthy baseline p95 latencies (histogram_quantile 0.95, 5m rate):
 Other thresholds:
 - gateway_error_rate > 0.05
 - payment_failure_rate > 0.05
-- cache_hit_ratio < 0.8
+- redis_cache_hit_ratio < 0.5  → warning; < 0.2 → critical
 
 Steps:
 1. Use execute_promql to query p95 latency via histogram_quantile(0.95, rate(<metric>_bucket[5m])).

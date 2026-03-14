@@ -56,15 +56,23 @@ def _simulate():
         # Cache operations
         is_hit = random.random() < 0.92  # 92% hit ratio normally
 
-        if anomaly["enabled"] and anomaly["type"] == "error":
-            is_hit = random.random() < 0.40  # degraded hit ratio
+        if anomaly["enabled"]:
+            if anomaly["type"] == "cache_failure":
+                is_hit = random.random() < 0.05  # 95% misses — cache effectively down
+            elif anomaly["type"] == "error":
+                is_hit = random.random() < 0.40
 
         if is_hit:
             CACHE_HITS.inc()
         else:
             CACHE_MISSES.inc()
 
-        HIT_RATIO.set(0.40 if (anomaly["enabled"] and anomaly["type"] == "error") else 0.92)
+        if anomaly["enabled"] and anomaly["type"] == "cache_failure":
+            HIT_RATIO.set(0.05)
+        elif anomaly["enabled"] and anomaly["type"] == "error":
+            HIT_RATIO.set(0.40)
+        else:
+            HIT_RATIO.set(0.92)
 
         # Memory simulation
         if anomaly["enabled"] and anomaly["type"] == "memory_leak":
