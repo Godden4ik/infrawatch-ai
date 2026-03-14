@@ -40,6 +40,7 @@ async def monitor_node(state: PipelineState, tools: list[BaseTool]) -> dict:
         llm=llm,
         tools=tools,
         system_prompt=MONITOR_SYSTEM_PROMPT,
+        max_tool_rounds=3,
         human_message=(
             "Check all services for anomalies. Query these key metrics:\n"
             "- gateway_error_rate\n"
