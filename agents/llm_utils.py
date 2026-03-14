@@ -54,10 +54,19 @@ async def run_agent_with_tools(
             )
     else:
         # Loop exhausted max_tool_rounds — last message is a ToolMessage.
-        # Do one final LLM call so the agent can produce its text summary.
+        # Inject an explicit instruction then make one final non-tool LLM call.
         logger.info("  max_tool_rounds reached — making final summary call")
-        response = await bound_llm.ainvoke(messages)
-        messages.append(response)
+        messages.append(HumanMessage(
+            content=(
+                "You have reached the tool call limit. "
+                "Do NOT call any more tools. "
+                "Using only the information already retrieved above, "
+                "produce your final response now including the required JSON block."
+            )
+        ))
+        # Use base LLM (no tools bound) so it cannot emit tool_calls
+        final_response = await llm.ainvoke(messages)
+        messages.append(final_response)
 
     final_content = messages[-1].content if messages else ""
     if isinstance(final_content, list):

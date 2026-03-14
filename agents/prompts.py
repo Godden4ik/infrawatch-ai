@@ -78,5 +78,9 @@ Your plan should include:
 
 Use your tools to look up service ownership and dependency information if needed.
 
+IMPORTANT: Always output a remediation plan. If root cause details are incomplete, \
+state your assumptions clearly and draft the best plan you can based on the anomalies \
+and blast radius data provided. Do not ask for more information.
+
 Output the full remediation plan as clear, actionable markdown.\
 """
