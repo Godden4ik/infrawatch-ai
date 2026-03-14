@@ -4,9 +4,8 @@ import random
 import threading
 import time
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Response
 from prometheus_client import Counter, Gauge, Histogram, generate_latest
-from starlette.responses import Response
 
 app = FastAPI(title="api-gateway")
 
