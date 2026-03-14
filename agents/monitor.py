@@ -1,11 +1,14 @@
 """Monitor agent node — polls Prometheus/Grafana and detects anomalies."""
 
 import json
+import logging
 import re
 
 from langchain_core.tools import BaseTool
 
 from agents.config import get_llm
+
+logger = logging.getLogger(__name__)
 from agents.llm_utils import run_agent_with_tools
 from agents.prompts import MONITOR_SYSTEM_PROMPT
 from agents.state import PipelineState
@@ -31,6 +34,7 @@ def _parse_anomalies(text: str) -> list[dict]:
 
 async def monitor_node(state: PipelineState, tools: list[BaseTool]) -> dict:
     """Check all services for anomalies using Prometheus and Grafana tools."""
+    logger.info("=== MONITOR AGENT (iteration %d) ===", state.get("iteration", 0))
     llm = get_llm()
     messages, content = await run_agent_with_tools(
         llm=llm,
@@ -52,6 +56,15 @@ async def monitor_node(state: PipelineState, tools: list[BaseTool]) -> dict:
     anomalies = _parse_anomalies(content)
     # Strip the JSON block from content to get the summary
     health_summary = re.sub(r"```json[\s\S]*?```", "", content).strip()
+
+    if anomalies:
+        logger.info("  Found %d anomaly(ies):", len(anomalies))
+        for a in anomalies:
+            logger.info("    [%s] %s — %s = %s (threshold %s)",
+                        a.get("severity", "?").upper(), a.get("service"), a.get("metric"),
+                        a.get("value"), a.get("threshold"))
+    else:
+        logger.info("  No anomalies detected — infrastructure healthy")
 
     return {
         "messages": messages,

@@ -1,15 +1,19 @@
 """InfraWatch AI agent pipeline — Monitor → Analyst → Responder."""
 
+from agents.config import setup_logging
 from agents.graph import build_graph
 from agents.tools import ANALYST_TOOLS, MONITOR_TOOLS, RESPONDER_TOOLS, create_mcp_client, filter_tools, load_all_tools
 
 
-async def run_pipeline() -> dict:
+async def run_pipeline(verbose: bool = True) -> dict:
     """Run the full agent pipeline with live MCP servers.
 
     Creates an MCP client, loads all tools, builds the graph, and invokes it.
     Returns the final PipelineState dict.
     """
+    if verbose:
+        import logging
+        setup_logging(logging.INFO)
     client = create_mcp_client()
     all_tools = await load_all_tools(client)
 

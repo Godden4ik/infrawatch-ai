@@ -1,5 +1,6 @@
 """Configuration — LLM factory, MCP server paths, environment loading."""
 
+import logging
 import os
 from pathlib import Path
 
@@ -7,6 +8,19 @@ from dotenv import load_dotenv
 from langchain_anthropic import ChatAnthropic
 
 load_dotenv()
+
+
+def setup_logging(level: int = logging.INFO) -> None:
+    """Configure pipeline logging. Call once before run_pipeline()."""
+    logging.basicConfig(
+        level=level,
+        format="%(asctime)s [%(levelname)s] %(name)s — %(message)s",
+        datefmt="%H:%M:%S",
+        force=True,
+    )
+    # Silence noisy third-party loggers
+    for noisy in ("httpx", "httpcore", "mcp", "anthropic"):
+        logging.getLogger(noisy).setLevel(logging.WARNING)
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
