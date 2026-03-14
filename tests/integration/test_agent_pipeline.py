@@ -33,5 +33,10 @@ async def test_prometheus_tool_callable():
     list_metrics = next(t for t in tools if t.name == "list_metrics")
 
     result = await list_metrics.ainvoke({})
-    assert isinstance(result, str)
-    assert "gateway" in result.lower() or "error" not in result.lower()
+    # Tool may return a plain string or a list of content blocks
+    if isinstance(result, list):
+        text = " ".join(block.get("text", "") if isinstance(block, dict) else str(block) for block in result)
+    else:
+        text = result
+    assert isinstance(text, str) and len(text) > 0
+    assert "gateway" in text.lower()
