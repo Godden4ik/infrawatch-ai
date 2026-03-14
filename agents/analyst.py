@@ -49,10 +49,24 @@ async def analyst_node(state: PipelineState, tools: list[BaseTool]) -> dict:
     logger.info("  Root cause: %s", analysis.get("root_cause", "(not parsed)")[:120])
     logger.info("  Confidence: %.2f | Blast radius: %d service(s)",
                 analysis.get("confidence", 0.5), len(analysis.get("blast_radius", [])))
+
+    # Extract GraphRAG references from analysis
+    similar_incidents = [
+        {"id": iid} for iid in analysis.get("similar_incidents", [])
+    ]
+    relevant_runbooks = [
+        {"id": rid} for rid in analysis.get("relevant_runbooks", [])
+    ]
+    logger.info("  Similar incidents: %s | Relevant runbooks: %s",
+                [i["id"] for i in similar_incidents],
+                [r["id"] for r in relevant_runbooks])
+
     return {
         "messages": messages,
         "root_cause": analysis.get("root_cause", content),
         "blast_radius": analysis.get("blast_radius", []),
         "confidence": analysis.get("confidence", 0.5),
+        "similar_incidents": similar_incidents,
+        "relevant_runbooks": relevant_runbooks,
         "iteration": state.get("iteration", 0) + 1,
     }

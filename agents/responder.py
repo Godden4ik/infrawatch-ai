@@ -19,6 +19,8 @@ async def responder_node(state: PipelineState, tools: list[BaseTool]) -> dict:
     logger.info("  Root cause: %s", str(state.get("root_cause", ""))[:100])
     llm = get_llm()
     blast_json = json.dumps(state.get("blast_radius", []), indent=2)
+    similar_json = json.dumps(state.get("similar_incidents", []), indent=2)
+    runbooks_json = json.dumps(state.get("relevant_runbooks", []), indent=2)
     messages, content = await run_agent_with_tools(
         llm=llm,
         tools=tools,
@@ -27,8 +29,10 @@ async def responder_node(state: PipelineState, tools: list[BaseTool]) -> dict:
             f"Root cause: {state.get('root_cause', 'Unknown')}\n\n"
             f"Blast radius:\n{blast_json}\n\n"
             f"Confidence: {state.get('confidence', 0.0)}\n\n"
-            "Draft a remediation plan with immediate actions, affected teams, "
-            "verification steps, and prevention measures."
+            f"Similar past incidents:\n{similar_json}\n\n"
+            f"Relevant runbooks:\n{runbooks_json}\n\n"
+            "Draft a remediation plan with immediate actions (citing runbook IDs), "
+            "affected teams, verification steps, prevention measures, and historical context."
         ),
     )
 

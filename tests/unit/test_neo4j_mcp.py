@@ -17,6 +17,10 @@ _spec.loader.exec_module(_mod)
 run_cypher = _mod.run_cypher
 get_service_dependencies = _mod.get_service_dependencies
 get_blast_radius = _mod.get_blast_radius
+search_runbooks = _mod.search_runbooks
+find_similar_incidents = _mod.find_similar_incidents
+get_runbook_for_service = _mod.get_runbook_for_service
+search_knowledge_base = _mod.search_knowledge_base
 
 
 class FakeRecord:
@@ -136,3 +140,181 @@ async def test_get_blast_radius_no_dependents():
         result = json.loads(await get_blast_radius("api-gateway"))
         assert result["affected"] == []
         assert "No upstream" in result["message"]
+
+
+# ── Tests for new GraphRAG tools ─────────────────────────────────────
+
+
+FAKE_EMBEDDING = [0.1] * 384
+
+
+@pytest.mark.asyncio
+async def test_search_runbooks_returns_results():
+    records = [
+        {
+            "content": "Check Redis health",
+            "step_title": "Verify Redis",
+            "runbook_id": "RB-001",
+            "runbook_title": "Redis Cache Failure Recovery",
+            "category": "cache",
+            "severity": "P1",
+            "applies_to_services": ["redis-cache"],
+            "referenced_services": ["redis-cache"],
+            "score": 0.9,
+        }
+    ]
+    with patch.object(_mod, "_embed", return_value=FAKE_EMBEDDING), \
+         patch.object(_mod, "_make_driver", return_value=_make_mock_driver(records)):
+        result = json.loads(await search_runbooks("redis is down"))
+        assert len(result) == 1
+        assert result[0]["runbook_id"] == "RB-001"
+
+
+@pytest.mark.asyncio
+async def test_search_runbooks_boosts_service_match():
+    records = [
+        {
+            "content": "Generic step",
+            "step_title": "Step A",
+            "runbook_id": "RB-003",
+            "runbook_title": "API Gateway Errors",
+            "category": "error",
+            "severity": "P2",
+            "applies_to_services": ["api-gateway"],
+            "referenced_services": [],
+            "score": 0.95,
+        },
+        {
+            "content": "Redis step",
+            "step_title": "Step B",
+            "runbook_id": "RB-001",
+            "runbook_title": "Redis Failure",
+            "category": "cache",
+            "severity": "P1",
+            "applies_to_services": ["redis-cache"],
+            "referenced_services": ["redis-cache"],
+            "score": 0.85,
+        },
+    ]
+    with patch.object(_mod, "_embed", return_value=FAKE_EMBEDDING), \
+         patch.object(_mod, "_make_driver", return_value=_make_mock_driver(records)):
+        result = json.loads(await search_runbooks("cache failure", service_name="redis-cache"))
+        # Redis result should be boosted to top despite lower score
+        assert result[0]["runbook_id"] == "RB-001"
+
+
+@pytest.mark.asyncio
+async def test_find_similar_incidents_returns_results():
+    records = [
+        {
+            "incident_id": "INC-2024-001",
+            "title": "Redis OOM Cascade",
+            "severity": "P1",
+            "root_cause": "Redis OOM",
+            "resolution": "Restarted Redis",
+            "duration_minutes": 45,
+            "affected_services": ["redis-cache"],
+            "root_cause_services": ["redis-cache"],
+            "resolved_by_runbooks": ["RB-001"],
+            "symptoms": ["memory_pressure"],
+            "score": 0.9,
+        }
+    ]
+    with patch.object(_mod, "_embed", return_value=FAKE_EMBEDDING), \
+         patch.object(_mod, "_make_driver", return_value=_make_mock_driver(records)):
+        result = json.loads(await find_similar_incidents("redis out of memory"))
+        assert len(result) == 1
+        assert result[0]["incident_id"] == "INC-2024-001"
+
+
+@pytest.mark.asyncio
+async def test_find_similar_incidents_severity_filter():
+    records = [
+        {"incident_id": "INC-001", "title": "P1 Inc", "severity": "P1",
+         "root_cause": "x", "resolution": "y", "duration_minutes": 10,
+         "affected_services": [], "root_cause_services": [],
+         "resolved_by_runbooks": [], "symptoms": [], "score": 0.9},
+        {"incident_id": "INC-002", "title": "P3 Inc", "severity": "P3",
+         "root_cause": "x", "resolution": "y", "duration_minutes": 5,
+         "affected_services": [], "root_cause_services": [],
+         "resolved_by_runbooks": [], "symptoms": [], "score": 0.8},
+    ]
+    with patch.object(_mod, "_embed", return_value=FAKE_EMBEDDING), \
+         patch.object(_mod, "_make_driver", return_value=_make_mock_driver(records)):
+        result = json.loads(await find_similar_incidents("issue", severity="P1"))
+        assert len(result) == 1
+        assert result[0]["severity"] == "P1"
+
+
+@pytest.mark.asyncio
+async def test_get_runbook_for_service_returns_runbooks():
+    # Use simple types to avoid _serialize_value treating dicts as Neo4j Nodes
+    records = [
+        {
+            "runbook_id": "RB-001",
+            "title": "Redis Cache Failure Recovery",
+            "category": "cache",
+            "severity": "P1",
+            "author": "platform-team",
+            "steps": ["Step 1: Check Redis health"],
+        }
+    ]
+    with patch.object(_mod, "_make_driver", return_value=_make_mock_driver(records)):
+        result = json.loads(await get_runbook_for_service("redis-cache"))
+        assert result["service"] == "redis-cache"
+        assert len(result["runbooks"]) == 1
+        assert result["runbooks"][0]["runbook_id"] == "RB-001"
+
+
+@pytest.mark.asyncio
+async def test_get_runbook_for_service_no_results():
+    with patch.object(_mod, "_make_driver", return_value=_make_mock_driver([])):
+        result = json.loads(await get_runbook_for_service("nonexistent-service"))
+        assert result["runbooks"] == []
+        assert "No runbooks found" in result["message"]
+
+
+@pytest.mark.asyncio
+async def test_get_runbook_for_service_category_filter():
+    records = [
+        {"runbook_id": "RB-001", "title": "Cache Recovery", "category": "cache",
+         "severity": "P1", "author": "platform", "steps": "step1"},
+        {"runbook_id": "RB-004", "title": "Memory Leak", "category": "memory",
+         "severity": "P2", "author": "platform", "steps": "step1"},
+    ]
+    with patch.object(_mod, "_make_driver", return_value=_make_mock_driver(records)):
+        result = json.loads(await get_runbook_for_service("redis-cache", category="cache"))
+        assert len(result["runbooks"]) == 1
+        assert result["runbooks"][0]["category"] == "cache"
+
+
+@pytest.mark.asyncio
+async def test_search_knowledge_base_graphrag_mode():
+    records = [
+        {"content": "step content", "step_title": "step", "runbook_id": "RB-001",
+         "runbook_title": "title", "services": ["redis-cache"], "references": [], "score": 0.9},
+    ]
+    with patch.object(_mod, "_embed", return_value=FAKE_EMBEDDING), \
+         patch.object(_mod, "_make_driver", return_value=_make_mock_driver(records)):
+        result = json.loads(await search_knowledge_base("redis down", mode="graphrag"))
+        assert result["mode"] == "graphrag"
+        assert "runbooks" in result
+        assert "incidents" in result
+
+
+@pytest.mark.asyncio
+async def test_search_knowledge_base_naive_mode():
+    records = [
+        {"content": "step content", "step_title": "step", "runbook_id": "RB-001",
+         "runbook_title": "title", "score": 0.9},
+    ]
+    with patch.object(_mod, "_embed", return_value=FAKE_EMBEDDING), \
+         patch.object(_mod, "_make_driver", return_value=_make_mock_driver(records)):
+        result = json.loads(await search_knowledge_base("redis down", mode="naive"))
+        assert result["mode"] == "naive"
+
+
+@pytest.mark.asyncio
+async def test_search_knowledge_base_invalid_mode():
+    result = json.loads(await search_knowledge_base("test", mode="invalid"))
+    assert "error" in result
