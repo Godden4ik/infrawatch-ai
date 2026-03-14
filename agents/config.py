@@ -46,7 +46,7 @@ MCP_SERVERS = {
 def get_llm(temperature: float = 0.0) -> ChatAnthropic:
     """Return a ChatAnthropic instance for agent use."""
     return ChatAnthropic(
-        model="claude-sonnet-4-20250514",
+        model="claude-haiku-4-5-20251001",
         temperature=temperature,
         api_key=os.getenv("ANTHROPIC_API_KEY"),
     )

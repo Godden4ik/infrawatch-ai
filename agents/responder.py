@@ -25,6 +25,7 @@ async def responder_node(state: PipelineState, tools: list[BaseTool]) -> dict:
         llm=llm,
         tools=tools,
         system_prompt=RESPONDER_SYSTEM_PROMPT,
+        max_tool_rounds=3,
         human_message=(
             f"Root cause: {state.get('root_cause', 'Unknown')}\n\n"
             f"Blast radius:\n{blast_json}\n\n"

@@ -62,7 +62,7 @@ services/      # Simulated microservices emitting Prometheus metrics  ✅ DONE
 mcp-servers/   # Three MCP servers: Grafana, Prometheus, Neo4j        ✅ DONE
 agents/        # LangGraph pipeline: Monitor → Analyst → Responder      ✅ DONE
 graph/         # Neo4j schemas, seed data, GraphRAG pipeline          ✅ DONE
-ui/            # Streamlit dashboard                                   🔲 TODO
+ui/            # Streamlit dashboard                                   ✅ DONE
 tests/         # unit/ ✅  integration/ ✅  e2e/ ✅
 scripts/       # inject_anomaly.py — anomaly injection CLI             ✅ DONE
 ```
@@ -101,7 +101,7 @@ A key deliverable is demonstrating GraphRAG superiority for topology-dependent q
 | Phase 2 | MCP servers (Grafana, Prometheus, Neo4j) | ✅ Complete |
 | Phase 3 | LangGraph agent pipeline | ✅ Complete |
 | Phase 4 | GraphRAG pipeline + runbook ingestion | ✅ Complete |
-| Phase 5 | Streamlit UI + demo scenarios | 🔲 TODO |
+| Phase 5 | Streamlit UI + demo scenarios | ✅ Complete |
 
 ## Key Scenarios to Implement
 

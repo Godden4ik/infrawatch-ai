@@ -9,6 +9,9 @@ from langchain_core.tools import BaseTool
 logger = logging.getLogger(__name__)
 
 
+_TOOL_RESULT_MAX_CHARS = 3000  # truncate tool results to keep context small
+
+
 async def run_agent_with_tools(
     llm: ChatAnthropic,
     tools: list[BaseTool],
@@ -49,8 +52,11 @@ async def run_agent_with_tools(
                 result = await tool.ainvoke(tc["args"])
                 result_preview = str(result)[:120].replace("\n", " ")
                 logger.info("  [TOOL] %s(%s) → %s…", tc["name"], args_summary, result_preview)
+            result_str = str(result)
+            if len(result_str) > _TOOL_RESULT_MAX_CHARS:
+                result_str = result_str[:_TOOL_RESULT_MAX_CHARS] + "\n[truncated]"
             messages.append(
-                ToolMessage(content=str(result), tool_call_id=tc["id"])
+                ToolMessage(content=result_str, tool_call_id=tc["id"])
             )
     else:
         # Loop exhausted max_tool_rounds — last message is a ToolMessage.

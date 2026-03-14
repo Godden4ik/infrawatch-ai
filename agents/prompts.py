@@ -8,13 +8,13 @@ tools, then report any anomalies you find.
 
 Healthy baseline p95 latencies (histogram_quantile 0.95, 5m rate):
 - api-gateway:      ~100ms   → anomaly threshold: > 400ms
-- payment-service:  ~950ms   → anomaly threshold: > 2000ms
-- user-service:     ~90ms    → anomaly threshold: > 350ms
-- order-service:    ~2400ms  → anomaly threshold: > 5000ms
+- payment-service:  ~930ms   → anomaly threshold: > 2000ms
+- user-service:     ~100ms   → anomaly threshold: > 350ms
+- order-service:    ~2300ms  → anomaly threshold: > 5000ms
 
 Other thresholds:
 - gateway_error_rate > 0.05
-- payment_failure_rate > 0.05
+- payment_failure_rate > 0.05  (baseline ~3% is normal, only alert above 5%)
 - redis_cache_hit_ratio < 0.5  → warning; < 0.2 → critical
 
 Steps:
