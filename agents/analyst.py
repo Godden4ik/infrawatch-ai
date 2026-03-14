@@ -30,6 +30,7 @@ async def analyst_node(state: PipelineState, tools: list[BaseTool]) -> dict:
         llm=llm,
         tools=tools,
         system_prompt=ANALYST_SYSTEM_PROMPT,
+        max_tool_rounds=8,
         human_message=(
             f"Detected anomalies:\n{anomalies_json}\n\n"
             f"Health summary: {state.get('health_summary', 'N/A')}\n\n"

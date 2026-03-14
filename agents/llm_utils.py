@@ -40,6 +40,11 @@ async def run_agent_with_tools(
             messages.append(
                 ToolMessage(content=str(result), tool_call_id=tc["id"])
             )
+    else:
+        # Loop exhausted max_tool_rounds — last message is a ToolMessage.
+        # Do one final LLM call so the agent can produce its text summary.
+        response = await bound_llm.ainvoke(messages)
+        messages.append(response)
 
     final_content = messages[-1].content if messages else ""
     if isinstance(final_content, list):
