@@ -21,6 +21,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ```bash
 docker compose up          # Deploy full stack (Prometheus, Grafana, Neo4j, services)
 python graph/seed.py       # Seed Neo4j topology (run once after compose up)
+python graph/ingest.py     # Ingest runbooks + incidents into Neo4j (local embeddings)
 
 pytest tests/unit/         # Unit tests — no services needed
 pytest tests/integration/  # Integration tests — requires docker compose up
@@ -30,6 +31,10 @@ pytest                     # All tests
 python scripts/inject_anomaly.py cascade        # Inject cascade failure scenario
 python scripts/inject_anomaly.py reset          # Clear all anomalies
 python scripts/inject_anomaly.py latency payment-service  # Inject on specific service
+
+python scripts/evaluate_rag.py           # GraphRAG vs Naive RAG comparison
+python scripts/evaluate_rag.py --json    # Structured output
+python scripts/evaluate_rag.py --query 3 # Single query
 
 python -c "import asyncio; from agents import run_pipeline; print(asyncio.run(run_pipeline()))"  # Run agent pipeline
 ```
@@ -56,7 +61,7 @@ gh pr create
 services/      # Simulated microservices emitting Prometheus metrics  ✅ DONE
 mcp-servers/   # Three MCP servers: Grafana, Prometheus, Neo4j        ✅ DONE
 agents/        # LangGraph pipeline: Monitor → Analyst → Responder      ✅ DONE
-graph/         # Neo4j schemas, seed data, GraphRAG pipeline          ✅ DONE (seed)
+graph/         # Neo4j schemas, seed data, GraphRAG pipeline          ✅ DONE
 ui/            # Streamlit dashboard                                   🔲 TODO
 tests/         # unit/ ✅  integration/ ✅  e2e/ ✅
 scripts/       # inject_anomaly.py — anomaly injection CLI             ✅ DONE
@@ -82,7 +87,7 @@ Each MCP server exposes domain-specific tools to agents:
 |--------|-------|
 | Prometheus MCP (`mcp-servers/prometheus_mcp/server.py`) | `execute_promql`, `list_metrics`, `get_targets` |
 | Grafana MCP (`mcp-servers/grafana_mcp/server.py`) | `list_dashboards`, `get_dashboard`, `get_panel`, `list_alerts` |
-| Neo4j MCP (`mcp-servers/neo4j_mcp/server.py`) | `run_cypher`, `get_service_dependencies`, `get_blast_radius` |
+| Neo4j MCP (`mcp-servers/neo4j_mcp/server.py`) | `run_cypher`, `get_service_dependencies`, `get_blast_radius`, `search_runbooks`, `find_similar_incidents`, `get_runbook_for_service`, `search_knowledge_base` |
 
 ### GraphRAG vs Naive RAG
 
@@ -95,7 +100,7 @@ A key deliverable is demonstrating GraphRAG superiority for topology-dependent q
 | Phase 1 | Docker Compose + simulated services + tests | ✅ Complete |
 | Phase 2 | MCP servers (Grafana, Prometheus, Neo4j) | ✅ Complete |
 | Phase 3 | LangGraph agent pipeline | ✅ Complete |
-| Phase 4 | GraphRAG pipeline + runbook ingestion | 🔲 TODO |
+| Phase 4 | GraphRAG pipeline + runbook ingestion | ✅ Complete |
 | Phase 5 | Streamlit UI + demo scenarios | 🔲 TODO |
 
 ## Key Scenarios to Implement
@@ -127,7 +132,6 @@ A key deliverable is demonstrating GraphRAG superiority for topology-dependent q
 | `NEO4J_URI` | `bolt://localhost:7687` | Neo4j MCP |
 | `NEO4J_USER` | `neo4j` | Neo4j MCP |
 | `NEO4J_PASSWORD` | `infrawatch` | Neo4j MCP |
-
 MCP servers use stdio transport — agents invoke them as subprocesses.
 
 ## Service Ports (local)

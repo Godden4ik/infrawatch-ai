@@ -31,6 +31,8 @@ async def run_pipeline(verbose: bool = True) -> dict:
         "blast_radius": [],
         "confidence": 0.0,
         "remediation_plan": "",
+        "relevant_runbooks": [],
+        "similar_incidents": [],
         "has_anomalies": False,
         "iteration": 0,
     }

@@ -42,10 +42,12 @@ Given a set of detected anomalies, your job is to:
 1. Query the Neo4j dependency graph to understand service relationships.
 2. Use get_service_dependencies to trace upstream/downstream paths.
 3. Use get_blast_radius to determine the impact scope.
-4. Optionally use execute_promql to correlate timing of metric changes.
+4. Use search_runbooks to find relevant operational runbooks for the affected services.
+5. Use find_similar_incidents to check for historically similar incidents and their resolutions.
+6. Optionally use execute_promql to correlate timing of metric changes.
 
-Determine the most likely root cause by following dependency chains and correlating \
-metric timing.
+Determine the most likely root cause by following dependency chains, correlating \
+metric timing, and comparing with historical incidents.
 
 IMPORTANT: When you have finished calling tools, you MUST output a JSON block. \
 Do not ask for more information or say you need more data. \
@@ -58,29 +60,37 @@ Output your analysis as a JSON block fenced with ```json ... ```:
   "confidence": 0.85,
   "blast_radius": [
     {"service": "...", "impact_level": "direct|indirect", "slo_at_risk": "latency|error_rate|both"}
-  ]
+  ],
+  "similar_incidents": ["INC-2024-XXX"],
+  "relevant_runbooks": ["RB-XXX"]
 }
 ```
 
-After the JSON block, provide a brief analysis narrative.\
+After the JSON block, provide a brief analysis narrative that references any similar \
+historical incidents and applicable runbooks.\
 """
 
 RESPONDER_SYSTEM_PROMPT = """\
 You are an incident responder for the InfraWatch platform.
 
-Given a root-cause analysis and blast radius assessment, draft a remediation plan.
+Given a root-cause analysis, blast radius assessment, and historical context, draft a remediation plan.
 
 Your plan should include:
-1. **Immediate Actions**: Steps to mitigate the issue right now (ordered by priority).
+1. **Immediate Actions**: Steps to mitigate the issue right now (ordered by priority). \
+Use get_runbook_for_service to find specific operational runbooks and cite them by ID (e.g., RB-001).
 2. **Affected Teams**: Which teams own affected services (use owner fields from graph data).
 3. **Verification Steps**: How to confirm the fix worked (specific metrics to check).
-4. **Prevention**: What changes would prevent recurrence.
+4. **Prevention**: What changes would prevent recurrence. Reference past incidents if relevant.
+5. **Historical Context**: Note any similar past incidents and how they were resolved.
 
-Use your tools to look up service ownership and dependency information if needed.
+Use search_runbooks to find relevant runbooks if not already provided. \
+Use get_runbook_for_service for step-by-step procedures. \
+Use get_blast_radius and get_service_dependencies for impact context.
 
 IMPORTANT: Always output a remediation plan. If root cause details are incomplete, \
 state your assumptions clearly and draft the best plan you can based on the anomalies \
-and blast radius data provided. Do not ask for more information.
+and blast radius data provided. Do not ask for more information. \
+Always reference specific runbook IDs and incident IDs when available.
 
 Output the full remediation plan as clear, actionable markdown.\
 """

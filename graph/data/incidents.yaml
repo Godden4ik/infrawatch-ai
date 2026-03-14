@@ -1,0 +1,230 @@
+incidents:
+  - id: INC-2024-001
+    title: "Redis OOM Cascade"
+    severity: P1
+    status: resolved
+    root_cause: "Redis exceeded maxmemory due to unbounded session key growth from user-service. OOM triggered evictions, then connection refusals, cascading to all dependent services."
+    root_cause_service: redis-cache
+    affected_services:
+      - redis-cache
+      - payment-service
+      - user-service
+      - order-service
+      - api-gateway
+    resolved_by: RB-001
+    symptoms:
+      - memory_pressure
+      - cache_miss_storm
+      - high_error_rate
+    resolution: "Restarted Redis with increased maxmemory (512MB → 1GB). Added TTL enforcement on session keys. Deployed monitoring alert for memory usage >80%."
+    duration_minutes: 45
+    detected_at: "2024-01-15T03:22:00Z"
+    resolved_at: "2024-01-15T04:07:00Z"
+    metrics_pattern:
+      redis_cache_hit_ratio: 0.02
+      payment_p95_latency_ms: 8500
+      gateway_error_rate: 0.42
+      user_error_rate: 0.85
+    description: "At 03:22 UTC, redis-cache hit OOM condition. Cache hit ratio dropped to 0.02 within minutes. Payment-service latency spiked to 8.5s as transaction-cache lookups failed. User-service auth completely failed (85% error rate) because session store was unavailable. API gateway error rate reached 42% as all backends degraded. Root cause was unbounded session key growth — user-service was not setting TTLs on session keys, causing steady memory growth until OOM."
+
+  - id: INC-2024-002
+    title: "Payment Latency Spike"
+    severity: P2
+    status: resolved
+    root_cause: "Payment-service internal processing bottleneck caused by unoptimized database query in transaction validation path."
+    root_cause_service: payment-service
+    affected_services:
+      - payment-service
+      - api-gateway
+    resolved_by: RB-002
+    symptoms:
+      - high_latency
+    resolution: "Identified slow query in payment validation. Added index on transaction_id field. P95 latency dropped from 4200ms to 800ms after fix."
+    duration_minutes: 30
+    detected_at: "2024-02-08T14:15:00Z"
+    resolved_at: "2024-02-08T14:45:00Z"
+    metrics_pattern:
+      payment_p95_latency_ms: 4200
+      gateway_error_rate: 0.08
+    description: "Payment-service p95 latency gradually increased over 2 hours, peaking at 4200ms (SLO: 500ms). API gateway started returning 504 timeouts for /api/payments route. Other services unaffected. Root cause was an unoptimized query that degraded under load. Fixed by adding a database index."
+
+  - id: INC-2024-003
+    title: "API Gateway 5xx Errors"
+    severity: P2
+    status: resolved
+    root_cause: "API gateway connection pool exhaustion during traffic spike. Default pool size too small for burst traffic."
+    root_cause_service: api-gateway
+    affected_services:
+      - api-gateway
+    resolved_by: RB-003
+    symptoms:
+      - high_error_rate
+      - connection_saturation
+    resolution: "Increased connection pool size from 50 to 200. Added connection pool monitoring alert. Error rate dropped to <0.01 after restart with new configuration."
+    duration_minutes: 20
+    detected_at: "2024-03-01T10:30:00Z"
+    resolved_at: "2024-03-01T10:50:00Z"
+    metrics_pattern:
+      gateway_error_rate: 0.15
+    description: "API gateway started returning 503 errors at 10:30 during a marketing-driven traffic spike. Error rate reached 15%. Backend services were healthy — the issue was entirely in the gateway's connection pool. Pool was configured for 50 connections, but burst traffic required 150+. Increased pool size and added monitoring."
+
+  - id: INC-2024-004
+    title: "User Auth Session Loss"
+    severity: P1
+    status: resolved
+    root_cause: "Redis restart during maintenance window cleared all session data. User-service had no session recovery mechanism."
+    root_cause_service: redis-cache
+    affected_services:
+      - user-service
+      - api-gateway
+    resolved_by: RB-006
+    symptoms:
+      - high_error_rate
+      - cache_miss_storm
+    resolution: "All users forced to re-authenticate. Added Redis persistence (AOF) to survive restarts. Implemented session recovery fallback in user-service."
+    duration_minutes: 60
+    detected_at: "2024-03-20T02:00:00Z"
+    resolved_at: "2024-03-20T03:00:00Z"
+    metrics_pattern:
+      redis_cache_hit_ratio: 0.0
+      user_error_rate: 0.95
+      gateway_error_rate: 0.30
+    description: "Scheduled Redis maintenance at 02:00 UTC involved a restart. All session data was lost because Redis had no persistence configured. User-service auth failures hit 95% as every session lookup returned null. API gateway showed 30% error rate on auth-required routes. Took 60 minutes for all users to re-authenticate naturally. Added AOF persistence and session recovery mechanism."
+
+  - id: INC-2024-005
+    title: "Order Processing Backlog"
+    severity: P3
+    status: resolved
+    root_cause: "Order-service processing queue backed up due to slow payment-service responses causing timeout accumulation."
+    root_cause_service: order-service
+    affected_services:
+      - order-service
+      - payment-service
+    resolved_by: RB-005
+    symptoms:
+      - queue_backlog
+      - high_latency
+    resolution: "Increased order-service timeout for payment calls from 5s to 15s. Added async processing for non-critical order steps. Cleared backlog manually."
+    duration_minutes: 90
+    detected_at: "2024-04-12T16:00:00Z"
+    resolved_at: "2024-04-12T17:30:00Z"
+    metrics_pattern:
+      order_p95_latency_ms: 12000
+      payment_p95_latency_ms: 3500
+    description: "Order-service queue depth grew steadily as payment-service responded slowly (p95: 3500ms). Orders were timing out at the 5s mark, being retried, further loading payment-service. Classic retry storm pattern. Fixed by increasing timeout and adding circuit breaker logic."
+
+  - id: INC-2024-006
+    title: "Redis Memory Leak"
+    severity: P2
+    status: resolved
+    root_cause: "Leaked connection handles in payment-service were keeping Redis memory allocated for stale transaction cache entries."
+    root_cause_service: redis-cache
+    affected_services:
+      - redis-cache
+      - payment-service
+    resolved_by: RB-004
+    symptoms:
+      - memory_pressure
+    resolution: "Fixed connection leak in payment-service Redis client. Set explicit TTLs on all transaction-cache keys. Memory usage stabilized."
+    duration_minutes: 120
+    detected_at: "2024-05-05T08:00:00Z"
+    resolved_at: "2024-05-05T10:00:00Z"
+    metrics_pattern:
+      redis_memory_usage_percent: 0.92
+    description: "Redis memory usage climbed steadily over 3 days from 40% to 92%. Investigation revealed payment-service was not releasing Redis connection handles properly, causing stale transaction-cache entries to persist indefinitely. No TTLs were set on these keys. Fixed by patching the connection pool cleanup and adding TTLs."
+
+  - id: INC-2024-007
+    title: "Payment Gateway Timeout"
+    severity: P1
+    status: resolved
+    root_cause: "Payment-service external payment gateway dependency timed out, causing all payment processing to stall and cascade to order-service."
+    root_cause_service: payment-service
+    affected_services:
+      - payment-service
+      - order-service
+      - api-gateway
+    resolved_by: RB-002
+    symptoms:
+      - high_latency
+      - high_error_rate
+      - queue_backlog
+    resolution: "Added circuit breaker for external payment gateway calls. Implemented fallback to queue-and-retry pattern. Reduced blast radius for future gateway outages."
+    duration_minutes: 35
+    detected_at: "2024-06-18T11:20:00Z"
+    resolved_at: "2024-06-18T11:55:00Z"
+    metrics_pattern:
+      payment_p95_latency_ms: 30000
+      payment_failure_rate: 0.78
+      order_p95_latency_ms: 15000
+      gateway_error_rate: 0.35
+    description: "External payment gateway became unresponsive at 11:20. Payment-service hung on gateway calls (30s timeout), exhausting all worker threads. Order-service calls to payment timed out, creating a backlog. API gateway error rate hit 35%. The cascade originated from a single external dependency with no circuit breaker."
+
+  - id: INC-2024-008
+    title: "Cache Hit Ratio Drop"
+    severity: P3
+    status: resolved
+    root_cause: "Deployment of new user-service version changed session key format, invalidating all existing cached sessions."
+    root_cause_service: redis-cache
+    affected_services:
+      - redis-cache
+      - user-service
+    resolved_by: RB-001
+    symptoms:
+      - cache_miss_storm
+    resolution: "Rolled back user-service to previous version. Added session key versioning to support rolling deployments without cache invalidation."
+    duration_minutes: 25
+    detected_at: "2024-07-22T09:10:00Z"
+    resolved_at: "2024-07-22T09:35:00Z"
+    metrics_pattern:
+      redis_cache_hit_ratio: 0.15
+      user_p95_latency_ms: 180
+    description: "After deploying user-service v2.3, cache hit ratio dropped from 0.85 to 0.15. The new version used a different session key format (added prefix), so all existing sessions were cache misses. User-service latency increased 2x due to cache misses. Rolled back and implemented key versioning strategy."
+
+  - id: INC-2024-009
+    title: "Full Cascade: Redis Failure"
+    severity: P1
+    status: resolved
+    root_cause: "Redis process crash due to corrupted AOF file. All dependent services lost cache and session access simultaneously."
+    root_cause_service: redis-cache
+    affected_services:
+      - redis-cache
+      - payment-service
+      - user-service
+      - order-service
+      - api-gateway
+    resolved_by: RB-007
+    symptoms:
+      - cache_miss_storm
+      - high_error_rate
+      - high_latency
+      - connection_saturation
+    resolution: "Deleted corrupted AOF file. Restarted Redis. All services recovered within 5 minutes. Added AOF integrity checks to monitoring."
+    duration_minutes: 30
+    detected_at: "2024-09-03T04:45:00Z"
+    resolved_at: "2024-09-03T05:15:00Z"
+    metrics_pattern:
+      redis_cache_hit_ratio: 0.0
+      payment_p95_latency_ms: 9000
+      user_error_rate: 0.90
+      order_p95_latency_ms: 18000
+      gateway_error_rate: 0.55
+    description: "At 04:45, Redis crashed with 'Bad file format reading the append only file' error. All services depending on Redis immediately degraded. Payment-service latency 9s, user-service 90% errors, order-service 18s latency, gateway 55% error rate. Classic cascade pattern with redis-cache as single point of failure. Deleted corrupted AOF, restarted Redis, services auto-recovered as caches warmed."
+
+  - id: INC-2024-010
+    title: "CPU Spike on Order Service"
+    severity: P3
+    status: resolved
+    root_cause: "Runaway retry loop in order-service when processing a malformed order payload."
+    root_cause_service: order-service
+    affected_services:
+      - order-service
+    resolved_by: RB-005
+    symptoms:
+      - high_latency
+    resolution: "Fixed input validation to reject malformed payloads early. Added retry limit with exponential backoff. CPU usage returned to normal."
+    duration_minutes: 15
+    detected_at: "2024-10-10T13:00:00Z"
+    resolved_at: "2024-10-10T13:15:00Z"
+    metrics_pattern:
+      order_p95_latency_ms: 7500
+    description: "Order-service CPU spiked to 95% at 13:00. A malformed order payload caused the processing loop to retry indefinitely. Each retry consumed CPU without progressing. Other orders queued behind the stuck one, causing latency spike to 7.5s. Fixed by adding input validation and retry limits."

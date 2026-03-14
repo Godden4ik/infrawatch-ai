@@ -1,0 +1,51 @@
+symptoms:
+  - id: SYM-001
+    name: high_latency
+    description: "Service response time exceeds SLO threshold, p95 latency spike"
+    metric_pattern: "histogram_quantile(0.95, rate({service}_request_duration_seconds_bucket[5m]))"
+    manifests_in:
+      - api-gateway
+      - payment-service
+      - user-service
+      - order-service
+
+  - id: SYM-002
+    name: high_error_rate
+    description: "HTTP 5xx error rate exceeds acceptable threshold"
+    metric_pattern: "rate({service}_requests_total{status=~'5..'}[5m]) / rate({service}_requests_total[5m])"
+    manifests_in:
+      - api-gateway
+      - payment-service
+      - order-service
+
+  - id: SYM-003
+    name: cache_miss_storm
+    description: "Redis cache hit ratio drops below 0.5, causing downstream overload"
+    metric_pattern: "redis_cache_hit_ratio"
+    manifests_in:
+      - redis-cache
+
+  - id: SYM-004
+    name: memory_pressure
+    description: "Service or infrastructure component running low on available memory"
+    metric_pattern: "process_resident_memory_bytes / process_virtual_memory_max_bytes"
+    manifests_in:
+      - redis-cache
+      - payment-service
+
+  - id: SYM-005
+    name: connection_saturation
+    description: "Connection pool exhaustion causing request queuing and timeouts"
+    metric_pattern: "rate({service}_connections_active[5m])"
+    manifests_in:
+      - redis-cache
+      - payment-service
+      - order-service
+
+  - id: SYM-006
+    name: queue_backlog
+    description: "Processing queue depth growing, orders or payments stalling"
+    metric_pattern: "rate({service}_queue_depth[5m])"
+    manifests_in:
+      - order-service
+      - payment-service
