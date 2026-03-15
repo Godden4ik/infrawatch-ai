@@ -16,10 +16,42 @@ NEO4J_USER = os.getenv("NEO4J_USER", "neo4j")
 NEO4J_PASSWORD = os.getenv("NEO4J_PASSWORD", "infrawatch")
 
 
-def run_pipeline_sync(verbose: bool = True) -> dict:
+def run_pipeline_sync(verbose: bool = True, llm_provider: str = "anthropic", llm_model: str | None = None) -> dict:
     """Run the async agent pipeline synchronously (bridge for Streamlit)."""
     from agents import run_pipeline
-    return asyncio.run(run_pipeline(verbose=verbose))
+    return asyncio.run(run_pipeline(verbose=verbose, llm_provider=llm_provider, llm_model=llm_model))
+
+
+def iter_pipeline_events(verbose: bool = False, llm_provider: str = "anthropic", llm_model: str | None = None):
+    """Synchronous generator of pipeline events for Streamlit streaming.
+
+    Yields raw event dicts from astream_events. Exhausts when the pipeline
+    finishes or the producer thread raises an exception.
+    """
+    import queue
+    import threading
+
+    q: queue.Queue = queue.Queue()
+
+    def _producer() -> None:
+        from agents import stream_pipeline
+
+        async def _run() -> None:
+            try:
+                async for event in stream_pipeline(verbose=verbose, llm_provider=llm_provider, llm_model=llm_model):
+                    q.put(event)
+            finally:
+                q.put(None)  # sentinel — always signals completion
+
+        asyncio.run(_run())
+
+    threading.Thread(target=_producer, daemon=True).start()
+
+    while True:
+        item = q.get(timeout=300)  # 5-minute hard timeout
+        if item is None:
+            break
+        yield item
 
 
 # ── Neo4j lookup helpers ──────────────────────────────────────────────

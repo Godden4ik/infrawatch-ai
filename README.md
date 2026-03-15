@@ -25,7 +25,7 @@ Five simulated microservices emit Prometheus metrics. Agents detect anomalies, t
 
 ## Quick Start
 
-**Prerequisites:** Docker, Docker Compose, Python 3.12+, Anthropic API key
+**Prerequisites:** Docker, Docker Compose, Python 3.12+, Anthropic API key (or Ollama for local inference)
 
 ```bash
 # 1. Start the full stack
@@ -47,7 +47,12 @@ streamlit run ui/app.py
 #   Neo4j:      http://localhost:7474  (neo4j / infrawatch)
 ```
 
-Set `ANTHROPIC_API_KEY` in a `.env` file at the project root before running the pipeline.
+Copy `.env.example` to `.env` and fill in your Anthropic API key — all other values default to the Docker Compose stack and can be left as-is:
+
+```bash
+cp .env.example .env
+# edit .env and set ANTHROPIC_API_KEY=sk-ant-...
+```
 
 ## Streamlit Dashboard
 
@@ -56,9 +61,9 @@ Set `ANTHROPIC_API_KEY` in a `.env` file at the project root before running the 
 | **Home** | System connectivity status for all services |
 | **Service Health** | Real-time Prometheus metrics with SLO indicators |
 | **Anomaly Injection** | Inject cascade/latency/error scenarios + trigger pipeline |
-| **Pipeline Results** | Monitor → Analyst → Responder output with expandable runbooks/incidents |
+| **Pipeline Results** | Live-streaming Monitor → Analyst → Responder output; token stream + tool call events per agent; expandable runbooks/incidents fetched from Neo4j |
 | **Dependency Graph** | Interactive Neo4j topology with health-colored nodes |
-| **GraphRAG Eval** | Side-by-side GraphRAG vs Naive RAG comparison with charts |
+| **GraphRAG Eval** | Side-by-side GraphRAG vs Naive RAG comparison with Plotly charts; LLM-as-judge scoring via Anthropic or Ollama |
 
 ## Service Ports
 
@@ -74,6 +79,35 @@ Set `ANTHROPIC_API_KEY` in a `.env` file at the project root before running the 
 | Neo4j HTTP | 7474 |
 | Neo4j Bolt | 7687 |
 | Streamlit UI | 8501 |
+
+## Demo Walkthrough
+
+The full demo runs in under 5 minutes once the stack is up. Follow this sequence:
+
+**1. Start the stack and seed data** (first time only)
+```bash
+docker compose up -d
+python graph/seed.py    # loads Neo4j topology
+python graph/ingest.py  # embeds runbooks + incidents
+```
+
+**2. Open the dashboard** at [http://localhost:8501](http://localhost:8501) — Home page shows green connectivity for all services.
+
+**3. Inject a cascade failure** — go to **Anomaly Injection** and click **💥 Inject Cascade Failure**. This takes Redis down and degrades Payment + Order services.
+
+**4. Wait ~60 seconds** for Prometheus to scrape the new values.
+
+**5. Run the agent pipeline** — go to **Pipeline Results**, select **Anthropic** in the sidebar, click **▶ Run Pipeline**. Watch the live token stream and tool calls as each agent runs:
+- **Monitor** detects elevated latency and cache hit ratio drop
+- **Analyst** traces the root cause through the Neo4j dependency graph
+- **Responder** drafts a remediation plan citing runbook IDs
+
+**6. Show the GraphRAG evaluation** — go to **GraphRAG Eval**, click **Run All**. Point out:
+- Service Coverage: GraphRAG `1.00` vs Naive RAG `0.00` on cascade queries
+- Context Richness: GraphRAG returns structured service relationship fields; Naive RAG returns none
+- LLM judge scores are similar for both — same documents retrieved, topology enrichment is the differentiator
+
+**7. Reset** — go back to Anomaly Injection, click **✅ Reset All Services**.
 
 ## Anomaly Injection
 
@@ -102,9 +136,34 @@ Run the full Monitor → Analyst → Responder pipeline:
 python -c "import asyncio; from agents import run_pipeline; print(asyncio.run(run_pipeline()))"
 ```
 
-Or use the **Run Pipeline** button on the Anomaly Injection page.
+Or use the **Run Pipeline** button on the Pipeline Results page, which streams live token output and tool call events per agent.
 
 The pipeline uses persistent MCP server sessions — the Neo4j server (and its embedding model) loads once per run, not once per tool call.
+
+### LLM Backend Selection
+
+Both the agent pipeline and the GraphRAG evaluation support switching between backends at runtime:
+
+| Backend | How to use | Notes |
+|---------|-----------|-------|
+| **Anthropic (default)** | Set `ANTHROPIC_API_KEY` in `.env` | Claude Haiku — reliable structured tool calling |
+| **Ollama (local)** | `ollama serve` + model pulled | Selected per-run in the UI sidebar / eval page |
+
+```bash
+# Ollama setup (one-time)
+ollama pull qwen2.5:14b   # recommended minimum for tool-calling pipelines
+ollama pull llama3.1      # usable for LLM-as-judge only (not reliable for agents)
+```
+
+> **Note:** The agent pipeline makes 10+ sequential structured tool calls per run. Models below ~14B parameters frequently hallucinate tool results or ignore tool outputs. The Anthropic backend is recommended for reliable agent behaviour; Ollama is fully functional for the GraphRAG LLM-as-judge (single JSON call per query).
+
+The CLI also accepts a provider flag via the Python API:
+
+```python
+import asyncio
+from agents import run_pipeline
+asyncio.run(run_pipeline(llm_provider="ollama", llm_model="qwen2.5:14b"))
+```
 
 ## MCP Servers
 
@@ -119,12 +178,14 @@ Three FastMCP servers expose infrastructure tools to agents via stdio transport:
 ## GraphRAG Evaluation
 
 ```bash
-python scripts/evaluate_rag.py           # Run all 10 queries, print comparison table
-python scripts/evaluate_rag.py --json    # Structured JSON output
-python scripts/evaluate_rag.py --query 3 # Single query (1-indexed)
+python scripts/evaluate_rag.py                          # Run all 10 queries, print comparison table
+python scripts/evaluate_rag.py --json                   # Structured JSON output
+python scripts/evaluate_rag.py --query 3                # Single query (1-indexed)
+python scripts/evaluate_rag.py --provider ollama        # Use Ollama as LLM judge
+python scripts/evaluate_rag.py --provider ollama --ollama-model qwen2.5:14b
 ```
 
-GraphRAG outperforms Naive RAG on topology-dependent queries (blast radius, cascade failures) by traversing the dependency graph alongside vector search.
+GraphRAG outperforms Naive RAG on topology-dependent queries (blast radius, cascade failures) by traversing the dependency graph alongside vector search. Both methods retrieve the same documents (verified by Jaccard content overlap); GraphRAG's advantage is the topology enrichment layer — structured service relationship fields — not better retrieval. The LLM-as-judge scores content quality, where both methods score similarly, isolating the topology layer as GraphRAG's differentiator.
 
 ## Testing
 

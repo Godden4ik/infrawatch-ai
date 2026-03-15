@@ -13,11 +13,11 @@ from agents.prompts import RESPONDER_SYSTEM_PROMPT
 from agents.state import PipelineState
 
 
-async def responder_node(state: PipelineState, tools: list[BaseTool]) -> dict:
+async def responder_node(state: PipelineState, tools: list[BaseTool], llm_provider: str = "anthropic", llm_model: str | None = None) -> dict:
     """Draft a remediation plan based on root cause and blast radius."""
     logger.info("=== RESPONDER AGENT ===")
     logger.info("  Root cause: %s", str(state.get("root_cause", ""))[:100])
-    llm = get_llm()
+    llm = get_llm(provider=llm_provider, model=llm_model)
     blast_json = json.dumps(state.get("blast_radius", []), indent=2)
     similar_json = json.dumps(state.get("similar_incidents", []), indent=2)
     runbooks_json = json.dumps(state.get("relevant_runbooks", []), indent=2)
