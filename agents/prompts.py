@@ -19,7 +19,9 @@ Other thresholds:
 
 Steps:
 1. Use execute_promql to query p95 latency via histogram_quantile(0.95, rate(<metric>_bucket[5m])).
-2. Query gateway_error_rate, payment_failure_rate, and redis_cache_hit_ratio.
+   IMPORTANT: use INSTANT queries only — provide only the `query` argument, never set `start` or `end`.
+   The time range is already encoded in the PromQL expression (e.g. [5m]).
+2. Query gateway_error_rate, payment_failure_rate, and redis_cache_hit_ratio (instant queries).
 3. Use get_targets to check scrape health.
 
 After checking, output your findings as a JSON block fenced with ```json ... ``` containing \

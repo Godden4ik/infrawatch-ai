@@ -9,7 +9,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Tech Stack
 
 - **Language**: Python 3.12+
-- **AI/Orchestration**: LangChain, LangGraph, Anthropic API (claude-haiku-4-5-20251001)
+- **AI/Orchestration**: LangChain, LangGraph, Anthropic API (claude-haiku-4-5-20251001), Ollama (optional local backend via `langchain-ollama`)
 - **Embeddings**: sentence-transformers `all-MiniLM-L6-v2` (local, used for Neo4j vector search)
 - **Monitoring**: Prometheus, Grafana
 - **Graph Database**: Neo4j (topology store + GraphRAG)
@@ -35,11 +35,13 @@ python scripts/inject_anomaly.py cascade        # Inject cascade failure scenari
 python scripts/inject_anomaly.py reset          # Clear all anomalies
 python scripts/inject_anomaly.py latency payment-service  # Inject on specific service
 
-python scripts/evaluate_rag.py           # GraphRAG vs Naive RAG comparison
-python scripts/evaluate_rag.py --json    # Structured output
-python scripts/evaluate_rag.py --query 3 # Single query
+python scripts/evaluate_rag.py                        # GraphRAG vs Naive RAG comparison (Anthropic judge)
+python scripts/evaluate_rag.py --json                 # Structured output
+python scripts/evaluate_rag.py --query 3              # Single query
+python scripts/evaluate_rag.py --provider ollama --ollama-model qwen2.5:14b  # Ollama judge
 
-python -c "import asyncio; from agents import run_pipeline; print(asyncio.run(run_pipeline()))"  # Run agent pipeline
+python -c "import asyncio; from agents import run_pipeline; print(asyncio.run(run_pipeline()))"  # Run agent pipeline (Anthropic)
+python -c "import asyncio; from agents import run_pipeline; print(asyncio.run(run_pipeline(llm_provider='ollama', llm_model='qwen2.5:14b')))"  # Ollama backend
 ```
 
 ## Package Management
@@ -86,7 +88,15 @@ Monitor Agent → Analyst Agent → Responder Agent
 - Persistent MCP sessions: `agents/__init__.py` opens one subprocess per MCP server for the full pipeline run (one session for prometheus, grafana, neo4j) — avoids reloading the sentence-transformers model on every tool call
 - Tool result truncation: 3000 chars max per tool result to keep context within 30k TPM rate limit
 - max_tool_rounds: monitor=3, analyst=4, responder=3
-- Model: `claude-haiku-4-5-20251001` (cheapest, sufficient for structured tool calling)
+- Default model: `claude-haiku-4-5-20251001` (cheapest, sufficient for structured tool calling)
+- Streaming: `stream_pipeline()` yields `astream_events(version="v2")` events; the UI renders live token output and tool call progress per agent node
+- Anomaly parsing: `_parse_anomalies()` only accepts a `\`\`\`json` fenced block that parses to a list with all required fields (`service`, `metric`, `value`, `threshold`, `severity`) — rejects hallucinated or malformed output
+
+**LLM backend selection:**
+- `llm_provider="anthropic"` (default) — `ChatAnthropic` via Anthropic API
+- `llm_provider="ollama"` + `llm_model="<name>"` — `ChatOllama` via local Ollama instance on `localhost:11434`
+- Provider and model are threaded through `run_pipeline` / `stream_pipeline` → `build_graph` → each node via `functools.partial`
+- Ollama requires ≥14B model for reliable structured tool calling; 7B models hallucinate tool results in multi-step pipelines
 
 ### MCP Servers
 
@@ -107,13 +117,19 @@ Five pages under `ui/pages/`, shared components in `ui/components/`:
 | Home | `app.py` | Connectivity checks for all services |
 | Service Health | `1_Dashboard.py` | Live Prometheus metrics, auto-refresh |
 | Anomaly Injection | `2_Anomaly_Injection.py` | Preset + manual injection, pipeline trigger |
-| Pipeline Results | `3_Pipeline_Results.py` | Full agent output; runbooks/incidents fetched from Neo4j by ID |
+| Pipeline Results | `3_Pipeline_Results.py` | Live token + tool-call streaming per agent; LLM provider selector (Anthropic/Ollama) in sidebar; runbooks/incidents fetched from Neo4j by ID |
 | Dependency Graph | `4_Dependency_Graph.py` | pyvis interactive graph, blast-radius highlighting |
-| GraphRAG Eval | `5_GraphRAG_Eval.py` | Side-by-side comparison + Plotly bar charts |
+| GraphRAG Eval | `5_GraphRAG_Eval.py` | Side-by-side comparison + Plotly bar charts; LLM-as-judge provider selector (Anthropic/Ollama + model name input) |
 
 ### GraphRAG vs Naive RAG
 
 A key deliverable is demonstrating GraphRAG superiority for topology-dependent queries (e.g., blast radius analysis). Runbooks and incident reports are ingested into Neo4j alongside the infrastructure topology graph. The `sentence-transformers` model generates embeddings; the Anthropic API is **not** used for embeddings.
+
+**LLM-as-judge** (`scripts/evaluate_rag.py` / `5_GraphRAG_Eval.py`):
+- Scores retrieved content on `content_relevance` and `actionability` (1–10 integers) per query
+- Supports `provider="anthropic"` (Claude Haiku via async SDK) and `provider="ollama"` (local REST call to `localhost:11434/api/chat` via `asyncio.to_thread`)
+- Both GraphRAG and Naive RAG retrieve the same documents (high Jaccard content overlap); the judge scores are expected to be similar — the structural metrics (service coverage, context richness) are where GraphRAG wins
+- CLI flags: `--provider anthropic|ollama`, `--ollama-model <name>`
 
 ## Phase Status
 

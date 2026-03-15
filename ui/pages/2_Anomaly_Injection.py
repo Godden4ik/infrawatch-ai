@@ -113,36 +113,15 @@ with col_btn:
             {"scenario": f"{selected_anomaly} → {selected_service}", "results": [result]}
         )
 
-st.divider()
+# ── Next step ─────────────────────────────────────────────────────────
 
-# ── Run Agent Pipeline ────────────────────────────────────────────────
-
-st.subheader("Agent Pipeline")
-st.markdown(
-    "Run the Monitor → Analyst → Responder pipeline. "
-    "Results are stored in session state and viewable on the **Pipeline Results** page."
-)
-
-col_run, col_hint = st.columns([1, 3])
-with col_run:
-    run_pipeline = st.button("🤖 Run Pipeline", width="stretch", type="primary")
-with col_hint:
-    st.caption("Wait ~60 s after injection before running (Prometheus scrape interval).")
-
-if run_pipeline:
-    from components.pipeline import run_pipeline_sync
-    with st.spinner("Running agent pipeline (this may take 30–90 seconds)..."):
-        try:
-            result = run_pipeline_sync(verbose=False)
-            st.session_state["pipeline_result"] = result
-            has = result.get("has_anomalies", False)
-            n_anomalies = len(result.get("anomalies", []))
-            if has:
-                st.warning(f"Pipeline complete — {n_anomalies} anomaly/anomalies detected. See Pipeline Results page.")
-            else:
-                st.success("Pipeline complete — all services healthy.")
-        except Exception as e:
-            st.error(f"Pipeline failed: {e}")
+if st.session_state.get("injection_history"):
+    st.divider()
+    st.info(
+        "**Anomaly injected.** Wait ~60 seconds for Prometheus to scrape the new values, "
+        "then run the agent pipeline to detect and analyse the failure."
+    )
+    st.page_link("pages/3_Pipeline_Results.py", label="▶ Go to Pipeline Results", icon="🤖")
 
 # ── Injection History ─────────────────────────────────────────────────
 

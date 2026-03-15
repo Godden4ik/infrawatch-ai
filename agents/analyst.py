@@ -25,13 +25,13 @@ def _parse_analysis(text: str) -> dict:
     return {}
 
 
-async def analyst_node(state: PipelineState, tools: list[BaseTool]) -> dict:
+async def analyst_node(state: PipelineState, tools: list[BaseTool], llm_provider: str = "anthropic", llm_model: str | None = None) -> dict:
     """Analyze anomalies by querying the dependency graph for root cause."""
     logger.info("=== ANALYST AGENT ===")
     logger.info("  Analyzing %d anomaly(ies) across: %s",
                 len(state["anomalies"]),
                 ", ".join({a.get("service", "?") for a in state["anomalies"]}))
-    llm = get_llm()
+    llm = get_llm(provider=llm_provider, model=llm_model)
     anomalies_json = json.dumps(state["anomalies"], indent=2)
     messages, content = await run_agent_with_tools(
         llm=llm,
