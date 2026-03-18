@@ -14,15 +14,11 @@ import asyncio
 import json
 import os
 import re
-import sys
 
 import anthropic
 from dotenv import load_dotenv
 
 load_dotenv()
-
-# Add project root to path
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from graph.retrieval import graphrag_retrieve, naive_rag_retrieve
 

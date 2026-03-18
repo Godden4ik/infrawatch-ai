@@ -18,22 +18,43 @@ _REQUIRED_ANOMALY_FIELDS = {"service", "metric", "value", "threshold", "severity
 
 
 def _parse_anomalies(text: str) -> list[dict]:
-    """Extract JSON anomaly list from a ```json ... ``` fenced block in the LLM response.
+    """Extract JSON anomaly list from the LLM response.
 
-    Each entry must have service, metric, value, threshold, and severity fields
-    to be considered a valid anomaly (rejects hallucinated or malformed entries).
+    Tries in order:
+    1. ```json ... ``` fenced block
+    2. ``` ... ``` fenced block (no language tag)
+    3. First [...] JSON array found anywhere in the text
+
+    Each entry must have service, metric, value, threshold, and severity fields.
     """
-    match = re.search(r"```json\s*([\s\S]*?)```", text)
-    if match:
+    candidates = []
+
+    # 1. ```json ... ```
+    m = re.search(r"```json\s*([\s\S]*?)```", text)
+    if m:
+        candidates.append(m.group(1).strip())
+
+    # 2. ``` ... ``` (no language tag, content starts with '[')
+    for m in re.finditer(r"```\s*(\[[\s\S]*?)```", text):
+        candidates.append(m.group(1).strip())
+
+    # 3. Any bare [...] array in the text
+    for m in re.finditer(r"(\[[\s\S]*?\])", text):
+        candidates.append(m.group(1).strip())
+
+    for candidate in candidates:
         try:
-            data = json.loads(match.group(1))
+            data = json.loads(candidate)
             if isinstance(data, list):
-                return [
+                valid = [
                     item for item in data
                     if isinstance(item, dict) and _REQUIRED_ANOMALY_FIELDS.issubset(item.keys())
                 ]
+                if valid:
+                    return valid
         except json.JSONDecodeError:
-            pass
+            continue
+
     return []
 
 
@@ -45,7 +66,7 @@ async def monitor_node(state: PipelineState, tools: list[BaseTool], llm_provider
         llm=llm,
         tools=tools,
         system_prompt=MONITOR_SYSTEM_PROMPT,
-        max_tool_rounds=3,
+        max_tool_rounds=4,
         human_message=(
             "Check all services for anomalies. Use INSTANT queries only (no start/end args).\n\n"
             "Run execute_promql for each of these expressions:\n"
@@ -55,9 +76,14 @@ async def monitor_node(state: PipelineState, tools: list[BaseTool], llm_provider
             "- histogram_quantile(0.95, rate(order_processing_duration_seconds_bucket[5m]))\n"
             "- gateway_error_rate\n"
             "- payment_failure_rate\n"
-            "- cache_hit_ratio\n\n"
+            "- redis_cache_hit_ratio\n\n"
             "Then call get_targets to check scrape health.\n\n"
-            "After all tool calls, output your findings in a ```json ... ``` block."
+            "After all tool calls, you MUST output a JSON block in EXACTLY this format:\n"
+            "```json\n"
+            '[{"service": "name", "metric": "name", "value": 0.0, "threshold": 0.0, "severity": "critical|warning|info"}]\n'
+            "```\n"
+            "Output an empty list ```json\n[]\n``` if everything is healthy. "
+            "The JSON block is REQUIRED — do not skip it."
         ),
     )
 
