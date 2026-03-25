@@ -1,11 +1,6 @@
 """Infrastructure Topology — interactive Neo4j dependency graph."""
 
-import sys
-import os
-
 import streamlit as st
-
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from components.graph_viz import (
     fetch_topology,
     apply_health_colors,

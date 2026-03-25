@@ -1,12 +1,8 @@
 """Unit tests for graph/retrieval.py — GraphRAG vs Naive RAG result structure."""
 
-import os
-import sys
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "../.."))
 
 from graph import retrieval
 

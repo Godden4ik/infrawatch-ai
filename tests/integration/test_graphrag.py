@@ -4,12 +4,9 @@ Tests ingestion into live Neo4j, vector index queries, and GraphRAG vs naive com
 """
 
 import os
-import sys
 
 import pytest
 from neo4j import GraphDatabase
-
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "../.."))
 
 NEO4J_URI = os.getenv("NEO4J_URI", "bolt://localhost:7687")
 NEO4J_USER = os.getenv("NEO4J_USER", "neo4j")

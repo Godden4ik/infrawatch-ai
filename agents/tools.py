@@ -8,7 +8,7 @@ from agents.config import MCP_SERVERS
 # Tool-name sets per agent role
 MONITOR_TOOLS = {"execute_promql", "list_metrics", "get_targets", "list_alerts", "get_panel"}
 ANALYST_TOOLS = {
-    "run_cypher", "get_service_dependencies", "get_blast_radius", "execute_promql",
+    "run_cypher", "get_service_dependencies", "get_blast_radius",
     "search_runbooks", "find_similar_incidents",
 }
 RESPONDER_TOOLS = {

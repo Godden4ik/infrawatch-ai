@@ -1,14 +1,9 @@
 """Unit tests for graph/ingest.py — YAML parsing, embedding calls, Cypher generation."""
 
-import os
-import sys
 from unittest.mock import MagicMock, patch
 
 import pytest
 import yaml
-
-# Ensure project root on path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "../.."))
 
 from graph.ingest import (
     load_incidents,

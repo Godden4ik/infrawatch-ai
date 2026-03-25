@@ -7,12 +7,9 @@ Injects anomalies, runs the pipeline, and verifies remediation references histor
 import asyncio
 import json
 import os
-import sys
 
 import httpx
 import pytest
-
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "../.."))
 
 SERVICE_URLS = {
     "api-gateway": "http://localhost:8080",
