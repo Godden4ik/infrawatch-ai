@@ -1,16 +1,8 @@
 """GraphRAG vs Naive RAG comparison page."""
 
 import asyncio
-import sys
-import os
 
 import streamlit as st
-
-_ui_root  = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))   # TEG/ui
-_teg_root = os.path.dirname(_ui_root)                                      # TEG
-for _p in (_ui_root, _teg_root):
-    if _p not in sys.path:
-        sys.path.insert(0, _p)
 
 st.set_page_config(page_title="GraphRAG Eval — InfraWatch AI", layout="wide")
 st.title("🔬 GraphRAG vs Naive RAG Evaluation")

@@ -46,7 +46,6 @@ Given a set of detected anomalies, your job is to:
 3. Use get_blast_radius to determine the impact scope.
 4. Use search_runbooks to find relevant operational runbooks for the affected services.
 5. Use find_similar_incidents to check for historically similar incidents and their resolutions.
-6. Optionally use execute_promql to correlate timing of metric changes.
 
 Determine the most likely root cause by following dependency chains, correlating \
 metric timing, and comparing with historical incidents.

@@ -1,12 +1,8 @@
 """Service Health Dashboard — real-time Prometheus metrics per service."""
 
-import sys
-import os
 import time
 
 import streamlit as st
-
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from components.metrics import (
     SERVICE_PORTS as _PORTS,
     fetch_service_metrics,

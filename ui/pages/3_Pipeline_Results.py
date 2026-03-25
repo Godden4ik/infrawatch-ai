@@ -1,11 +1,6 @@
 """Agent Pipeline — run the Monitor → Analyst → Responder pipeline with live streaming output."""
 
-import sys
-import os
-
 import streamlit as st
-
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from components.pipeline import (
     format_anomalies_table,
     format_blast_radius_table,

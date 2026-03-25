@@ -1,14 +1,10 @@
 """Scenario Control Panel — inject anomalies and trigger the agent pipeline."""
 
 import json
-import sys
-import os
 import urllib.error
 import urllib.request
 
 import streamlit as st
-
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 st.set_page_config(page_title="Anomaly Injection — InfraWatch AI", layout="wide")
 st.title("⚡ Anomaly Injection")

@@ -1,10 +1,6 @@
 """Unit tests for the anomaly injection script logic."""
 
-import sys
-import os
 import pytest
-
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "../.."))
 
 from scripts.inject_anomaly import SERVICE_PORTS, SCENARIOS
 

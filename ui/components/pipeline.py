@@ -2,14 +2,8 @@
 
 import asyncio
 import os
-import sys
 
 import streamlit as st
-
-# Ensure project root (TEG/) is on the path — go up 3 levels from ui/components/pipeline.py
-_project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-if _project_root not in sys.path:
-    sys.path.insert(0, _project_root)
 
 NEO4J_URI = os.getenv("NEO4J_URI", "bolt://localhost:7687")
 NEO4J_USER = os.getenv("NEO4J_USER", "neo4j")

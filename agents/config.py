@@ -24,21 +24,26 @@ def setup_logging(level: int = logging.INFO) -> None:
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
+_subprocess_env = os.environ.copy()
+
 MCP_SERVERS = {
     "prometheus": {
         "command": "python3",
         "args": [str(PROJECT_ROOT / "mcp-servers" / "prometheus_mcp" / "server.py")],
         "transport": "stdio",
+        "env": _subprocess_env,
     },
     "grafana": {
         "command": "python3",
         "args": [str(PROJECT_ROOT / "mcp-servers" / "grafana_mcp" / "server.py")],
         "transport": "stdio",
+        "env": _subprocess_env,
     },
     "neo4j": {
         "command": "python3",
         "args": [str(PROJECT_ROOT / "mcp-servers" / "neo4j_mcp" / "server.py")],
         "transport": "stdio",
+        "env": _subprocess_env,
     },
 }
 
@@ -54,8 +59,10 @@ def get_llm(temperature: float = 0.0, provider: str = "anthropic", model: str | 
     """
     if provider == "ollama":
         from langchain_ollama import ChatOllama
+        base_url = os.getenv("OLLAMA_URL", "http://localhost:11434")
         return ChatOllama(
             model=model or OLLAMA_DEFAULT_MODEL,
+            base_url=base_url,
             temperature=temperature,
         )
     return ChatAnthropic(
