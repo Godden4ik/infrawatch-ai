@@ -1,11 +1,14 @@
 """Analyst agent node — traces root cause through the dependency graph."""
 
 import json
+import logging
 import re
 
 from langchain_core.tools import BaseTool
 
 from agents.config import get_llm
+
+logger = logging.getLogger(__name__)
 from agents.llm_utils import run_agent_with_tools
 from agents.prompts import ANALYST_SYSTEM_PROMPT
 from agents.state import PipelineState
@@ -24,12 +27,17 @@ def _parse_analysis(text: str) -> dict:
 
 async def analyst_node(state: PipelineState, tools: list[BaseTool]) -> dict:
     """Analyze anomalies by querying the dependency graph for root cause."""
+    logger.info("=== ANALYST AGENT ===")
+    logger.info("  Analyzing %d anomaly(ies) across: %s",
+                len(state["anomalies"]),
+                ", ".join({a.get("service", "?") for a in state["anomalies"]}))
     llm = get_llm()
     anomalies_json = json.dumps(state["anomalies"], indent=2)
     messages, content = await run_agent_with_tools(
         llm=llm,
         tools=tools,
         system_prompt=ANALYST_SYSTEM_PROMPT,
+        max_tool_rounds=8,
         human_message=(
             f"Detected anomalies:\n{anomalies_json}\n\n"
             f"Health summary: {state.get('health_summary', 'N/A')}\n\n"
@@ -38,10 +46,27 @@ async def analyst_node(state: PipelineState, tools: list[BaseTool]) -> dict:
     )
 
     analysis = _parse_analysis(content)
+    logger.info("  Root cause: %s", analysis.get("root_cause", "(not parsed)")[:120])
+    logger.info("  Confidence: %.2f | Blast radius: %d service(s)",
+                analysis.get("confidence", 0.5), len(analysis.get("blast_radius", [])))
+
+    # Extract GraphRAG references from analysis
+    similar_incidents = [
+        {"id": iid} for iid in analysis.get("similar_incidents", [])
+    ]
+    relevant_runbooks = [
+        {"id": rid} for rid in analysis.get("relevant_runbooks", [])
+    ]
+    logger.info("  Similar incidents: %s | Relevant runbooks: %s",
+                [i["id"] for i in similar_incidents],
+                [r["id"] for r in relevant_runbooks])
+
     return {
         "messages": messages,
         "root_cause": analysis.get("root_cause", content),
         "blast_radius": analysis.get("blast_radius", []),
         "confidence": analysis.get("confidence", 0.5),
+        "similar_incidents": similar_incidents,
+        "relevant_runbooks": relevant_runbooks,
         "iteration": state.get("iteration", 0) + 1,
     }
