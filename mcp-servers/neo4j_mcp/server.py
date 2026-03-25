@@ -21,14 +21,8 @@ mcp = FastMCP(
     ),
 )
 
-_driver = None
-
-
-def _get_driver():
-    global _driver
-    if _driver is None:
-        _driver = AsyncGraphDatabase.driver(NEO4J_URI, auth=(NEO4J_USER, NEO4J_PASSWORD))
-    return _driver
+def _make_driver():
+    return AsyncGraphDatabase.driver(NEO4J_URI, auth=(NEO4J_USER, NEO4J_PASSWORD))
 
 
 def _serialize_value(value):
@@ -53,7 +47,7 @@ async def run_cypher(query: str, params: str | None = None) -> str:
 
     `params` is an optional JSON string of query parameters, e.g. '{"name": "redis-cache"}'.
     """
-    driver = _get_driver()
+    driver = _make_driver()
     parsed_params = {}
     if params:
         try:
@@ -84,16 +78,17 @@ async def get_service_dependencies(
 
     `max_depth`: maximum hops to traverse (default 3).
     """
+    depth = int(max_depth)
     if direction == "downstream":
         cypher = (
-            "MATCH path = (s:Service {name: $name})-[*1..$depth]->(t:Service) "
+            f"MATCH path = (s:Service {{name: $name}})-[*1..{depth}]->(t:Service) "
             "RETURN [n IN nodes(path) | n.name] AS services, "
             "[r IN relationships(path) | type(r)] AS relationships, "
             "length(path) AS depth"
         )
     elif direction == "upstream":
         cypher = (
-            "MATCH path = (t:Service)-[*1..$depth]->(s:Service {name: $name}) "
+            f"MATCH path = (t:Service)-[*1..{depth}]->(s:Service {{name: $name}}) "
             "RETURN [n IN nodes(path) | n.name] AS services, "
             "[r IN relationships(path) | type(r)] AS relationships, "
             "length(path) AS depth"
@@ -101,10 +96,10 @@ async def get_service_dependencies(
     else:
         return json.dumps({"error": f"Invalid direction '{direction}', use 'downstream' or 'upstream'"})
 
-    driver = _get_driver()
+    driver = _make_driver()
     try:
         async with driver.session() as session:
-            result = await session.run(cypher, name=service_name, depth=max_depth)
+            result = await session.run(cypher, name=service_name)
             records = [_serialize_record(r) async for r in result]
             return json.dumps(records, indent=2)
     except Exception as e:
@@ -131,7 +126,7 @@ async def get_blast_radius(service_name: str) -> str:
         "depth "
         "ORDER BY depth"
     )
-    driver = _get_driver()
+    driver = _make_driver()
     try:
         async with driver.session() as session:
             result = await session.run(cypher, name=service_name)

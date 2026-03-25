@@ -50,13 +50,6 @@ class FakeResult:
         return record
 
 
-@pytest.fixture(autouse=True)
-def _reset_driver():
-    _mod._driver = None
-    yield
-    _mod._driver = None
-
-
 def _make_mock_driver(records: list[dict]):
     """Create a mock AsyncGraphDatabase driver returning given records."""
     mock_result = FakeResult(records)
@@ -73,7 +66,7 @@ def _make_mock_driver(records: list[dict]):
 @pytest.mark.asyncio
 async def test_run_cypher_returns_records():
     records = [{"name": "api-gateway"}, {"name": "redis-cache"}]
-    with patch.object(_mod, "_get_driver", return_value=_make_mock_driver(records)):
+    with patch.object(_mod, "_make_driver", return_value=_make_mock_driver(records)):
         result = json.loads(await run_cypher("MATCH (s:Service) RETURN s.name AS name"))
         assert len(result) == 2
         assert result[0]["name"] == "api-gateway"
@@ -83,7 +76,7 @@ async def test_run_cypher_returns_records():
 async def test_run_cypher_with_params():
     records = [{"name": "redis-cache"}]
     mock_driver = _make_mock_driver(records)
-    with patch.object(_mod, "_get_driver", return_value=mock_driver):
+    with patch.object(_mod, "_make_driver", return_value=mock_driver):
         result = json.loads(await run_cypher(
             "MATCH (s:Service {name: $name}) RETURN s.name AS name",
             params='{"name": "redis-cache"}',
@@ -103,7 +96,7 @@ async def test_get_service_dependencies_downstream():
     records = [
         {"services": ["api-gateway", "payment-service"], "relationships": ["ROUTES_TO"], "depth": 1},
     ]
-    with patch.object(_mod, "_get_driver", return_value=_make_mock_driver(records)):
+    with patch.object(_mod, "_make_driver", return_value=_make_mock_driver(records)):
         result = json.loads(await get_service_dependencies("api-gateway", direction="downstream"))
         assert len(result) == 1
         assert "payment-service" in result[0]["services"]
@@ -114,7 +107,7 @@ async def test_get_service_dependencies_upstream():
     records = [
         {"services": ["payment-service", "redis-cache"], "relationships": ["DEPENDS_ON"], "depth": 1},
     ]
-    with patch.object(_mod, "_get_driver", return_value=_make_mock_driver(records)):
+    with patch.object(_mod, "_make_driver", return_value=_make_mock_driver(records)):
         result = json.loads(await get_service_dependencies("redis-cache", direction="upstream"))
         assert len(result) == 1
 
@@ -131,7 +124,7 @@ async def test_get_blast_radius_returns_affected():
         {"service": "payment-service", "type": "backend", "slo_latency_ms": 500, "slo_error_rate": 0.005, "owner": "payments-team", "dependency_chain": ["DEPENDS_ON"], "depth": 1},
         {"service": "api-gateway", "type": "gateway", "slo_latency_ms": 100, "slo_error_rate": 0.01, "owner": "platform-team", "dependency_chain": ["ROUTES_TO", "DEPENDS_ON"], "depth": 2},
     ]
-    with patch.object(_mod, "_get_driver", return_value=_make_mock_driver(records)):
+    with patch.object(_mod, "_make_driver", return_value=_make_mock_driver(records)):
         result = json.loads(await get_blast_radius("redis-cache"))
         assert result["service"] == "redis-cache"
         assert len(result["affected"]) == 2
@@ -139,7 +132,7 @@ async def test_get_blast_radius_returns_affected():
 
 @pytest.mark.asyncio
 async def test_get_blast_radius_no_dependents():
-    with patch.object(_mod, "_get_driver", return_value=_make_mock_driver([])):
+    with patch.object(_mod, "_make_driver", return_value=_make_mock_driver([])):
         result = json.loads(await get_blast_radius("api-gateway"))
         assert result["affected"] == []
         assert "No upstream" in result["message"]

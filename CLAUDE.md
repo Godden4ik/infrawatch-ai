@@ -30,6 +30,8 @@ pytest                     # All tests
 python scripts/inject_anomaly.py cascade        # Inject cascade failure scenario
 python scripts/inject_anomaly.py reset          # Clear all anomalies
 python scripts/inject_anomaly.py latency payment-service  # Inject on specific service
+
+python -c "import asyncio; from agents import run_pipeline; print(asyncio.run(run_pipeline()))"  # Run agent pipeline
 ```
 
 ## Package Management
@@ -53,7 +55,7 @@ gh pr create
 ```
 services/      # Simulated microservices emitting Prometheus metrics  ✅ DONE
 mcp-servers/   # Three MCP servers: Grafana, Prometheus, Neo4j        ✅ DONE
-agents/        # Three agents: Monitor, Analyst, Responder             🔲 TODO
+agents/        # LangGraph pipeline: Monitor → Analyst → Responder      ✅ DONE
 graph/         # Neo4j schemas, seed data, GraphRAG pipeline          ✅ DONE (seed)
 ui/            # Streamlit dashboard                                   🔲 TODO
 tests/         # unit/ ✅  integration/ ✅  e2e/ ✅
@@ -92,7 +94,7 @@ A key deliverable is demonstrating GraphRAG superiority for topology-dependent q
 |-------|-------------|--------|
 | Phase 1 | Docker Compose + simulated services + tests | ✅ Complete |
 | Phase 2 | MCP servers (Grafana, Prometheus, Neo4j) | ✅ Complete |
-| Phase 3 | LangGraph agent pipeline | 🔲 TODO |
+| Phase 3 | LangGraph agent pipeline | ✅ Complete |
 | Phase 4 | GraphRAG pipeline + runbook ingestion | 🔲 TODO |
 | Phase 5 | Streamlit UI + demo scenarios | 🔲 TODO |
 
