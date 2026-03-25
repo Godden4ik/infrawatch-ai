@@ -63,6 +63,9 @@ def _simulate():
         if anomaly["enabled"]:
             if anomaly["type"] == "latency":
                 proc_time += random.uniform(3.0, 10.0)
+            elif anomaly["type"] == "cache_degraded":
+                # Simulate DB fallback when redis cache is down
+                proc_time += random.uniform(3.0, 7.0)
             elif anomaly["type"] == "error":
                 failed = random.random() < 0.30
 

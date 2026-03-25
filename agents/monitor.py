@@ -1,57 +1,78 @@
 """Monitor agent node — polls Prometheus/Grafana and detects anomalies."""
 
 import json
+import logging
 import re
 
 from langchain_core.tools import BaseTool
 
 from agents.config import get_llm
+
+logger = logging.getLogger(__name__)
 from agents.llm_utils import run_agent_with_tools
 from agents.prompts import MONITOR_SYSTEM_PROMPT
 from agents.state import PipelineState
 
 
+_REQUIRED_ANOMALY_FIELDS = {"service", "metric", "value", "threshold", "severity"}
+
+
 def _parse_anomalies(text: str) -> list[dict]:
-    """Extract JSON anomaly list from LLM response text."""
+    """Extract JSON anomaly list from a ```json ... ``` fenced block in the LLM response.
+
+    Each entry must have service, metric, value, threshold, and severity fields
+    to be considered a valid anomaly (rejects hallucinated or malformed entries).
+    """
     match = re.search(r"```json\s*([\s\S]*?)```", text)
     if match:
         try:
-            return json.loads(match.group(1))
-        except json.JSONDecodeError:
-            pass
-    # Fallback: try to find a JSON array directly
-    match = re.search(r"\[[\s\S]*?\]", text)
-    if match:
-        try:
-            return json.loads(match.group(0))
+            data = json.loads(match.group(1))
+            if isinstance(data, list):
+                return [
+                    item for item in data
+                    if isinstance(item, dict) and _REQUIRED_ANOMALY_FIELDS.issubset(item.keys())
+                ]
         except json.JSONDecodeError:
             pass
     return []
 
 
-async def monitor_node(state: PipelineState, tools: list[BaseTool]) -> dict:
+async def monitor_node(state: PipelineState, tools: list[BaseTool], llm_provider: str = "anthropic", llm_model: str | None = None) -> dict:
     """Check all services for anomalies using Prometheus and Grafana tools."""
-    llm = get_llm()
+    logger.info("=== MONITOR AGENT (iteration %d) ===", state.get("iteration", 0))
+    llm = get_llm(provider=llm_provider, model=llm_model)
     messages, content = await run_agent_with_tools(
         llm=llm,
         tools=tools,
         system_prompt=MONITOR_SYSTEM_PROMPT,
+        max_tool_rounds=3,
         human_message=(
-            "Check all services for anomalies. Query these key metrics:\n"
+            "Check all services for anomalies. Use INSTANT queries only (no start/end args).\n\n"
+            "Run execute_promql for each of these expressions:\n"
+            "- histogram_quantile(0.95, rate(gateway_request_duration_seconds_bucket[5m]))\n"
+            "- histogram_quantile(0.95, rate(payment_processing_duration_seconds_bucket[5m]))\n"
+            "- histogram_quantile(0.95, rate(user_request_duration_seconds_bucket[5m]))\n"
+            "- histogram_quantile(0.95, rate(order_processing_duration_seconds_bucket[5m]))\n"
             "- gateway_error_rate\n"
             "- payment_failure_rate\n"
-            "- gateway_request_duration_seconds\n"
-            "- payment_processing_duration_seconds\n"
-            "- user_request_duration_seconds\n"
-            "- order_processing_duration_seconds\n"
-            "- cache_hit_ratio\n"
-            "Also check target health with get_targets."
+            "- cache_hit_ratio\n\n"
+            "Then call get_targets to check scrape health.\n\n"
+            "After all tool calls, output your findings in a ```json ... ``` block."
         ),
     )
 
     anomalies = _parse_anomalies(content)
     # Strip the JSON block from content to get the summary
     health_summary = re.sub(r"```json[\s\S]*?```", "", content).strip()
+
+    if anomalies:
+        logger.info("  Found %d anomaly(ies):", len(anomalies))
+        for a in anomalies:
+            logger.info("    [%s] %s — %s = %s (threshold %s)",
+                        a.get("severity", "?").upper(), a.get("service"), a.get("metric"),
+                        a.get("value"), a.get("threshold"))
+    else:
+        logger.info("  No anomalies detected — infrastructure healthy")
 
     return {
         "messages": messages,

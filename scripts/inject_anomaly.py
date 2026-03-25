@@ -44,21 +44,28 @@ def reset_all():
 
 
 def inject_cascade():
-    """Simulate Redis failure cascading to dependent services."""
-    print("Injecting cascade failure (Redis → dependents)...\n")
+    """Simulate Redis cache failure cascading to payment and order services.
 
-    # Redis gets memory leak + degraded hit ratio
-    print("1. Redis cache — memory_leak")
-    print(f"   {inject('redis-cache', 'memory_leak')}")
+    Signal chain visible in Prometheus:
+      redis_cache_hit_ratio            → 0.05  (cache effectively down)
+      payment_processing_duration p95  → ~7s   (DB fallback)
+      order_processing_duration p95    → ~7s   (DB fallback)
 
-    # Services that depend on Redis get latency (waiting for slow cache)
-    for svc in ("payment-service", "user-service", "order-service"):
-        print(f"2. {svc} — latency (downstream of Redis)")
-        print(f"   {inject(svc, 'latency')}")
+    The dependency graph confirms both services DEPENDS_ON redis-cache,
+    making root cause unambiguous for the analyst agent.
+    """
+    print("Injecting cascade: Redis cache failure → payment + order DB fallback\n")
 
-    # Gateway sees errors from slow backends
-    print("3. api-gateway — error (backends timing out)")
-    print(f"   {inject('api-gateway', 'error')}")
+    print("1. redis-cache      — cache_failure    (hit ratio → 0.05)")
+    print(f"   {inject('redis-cache', 'cache_failure')}")
+
+    print("2. payment-service  — cache_degraded   (DB fallback latency +3–7s)")
+    print(f"   {inject('payment-service', 'cache_degraded')}")
+
+    print("3. order-service    — cache_degraded   (DB fallback latency +3–7s)")
+    print(f"   {inject('order-service', 'cache_degraded')}")
+
+    print("\nWait ~60s for Prometheus to scrape the new values, then run the pipeline.")
 
 
 SCENARIOS = {

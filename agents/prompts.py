@@ -8,18 +8,20 @@ tools, then report any anomalies you find.
 
 Healthy baseline p95 latencies (histogram_quantile 0.95, 5m rate):
 - api-gateway:      ~100ms   → anomaly threshold: > 400ms
-- payment-service:  ~950ms   → anomaly threshold: > 2000ms
-- user-service:     ~90ms    → anomaly threshold: > 350ms
-- order-service:    ~2400ms  → anomaly threshold: > 5000ms
+- payment-service:  ~930ms   → anomaly threshold: > 2000ms
+- user-service:     ~100ms   → anomaly threshold: > 350ms
+- order-service:    ~2300ms  → anomaly threshold: > 5000ms
 
 Other thresholds:
 - gateway_error_rate > 0.05
-- payment_failure_rate > 0.05
+- payment_failure_rate > 0.05  (baseline ~3% is normal, only alert above 5%)
 - redis_cache_hit_ratio < 0.5  → warning; < 0.2 → critical
 
 Steps:
 1. Use execute_promql to query p95 latency via histogram_quantile(0.95, rate(<metric>_bucket[5m])).
-2. Query gateway_error_rate, payment_failure_rate, and redis_cache_hit_ratio.
+   IMPORTANT: use INSTANT queries only — provide only the `query` argument, never set `start` or `end`.
+   The time range is already encoded in the PromQL expression (e.g. [5m]).
+2. Query gateway_error_rate, payment_failure_rate, and redis_cache_hit_ratio (instant queries).
 3. Use get_targets to check scrape health.
 
 After checking, output your findings as a JSON block fenced with ```json ... ``` containing \
