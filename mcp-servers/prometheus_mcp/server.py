@@ -34,9 +34,12 @@ async def execute_promql(
 ) -> str:
     """Execute a PromQL query against Prometheus.
 
-    For instant queries, provide only `query`.
-    For range queries, provide `query`, `start`, `end` (ISO timestamps or relative like '1h'),
-    and optionally `step` (default '15s').
+    For instant queries (recommended), provide only `query` — do NOT set start or end.
+    The PromQL expression itself handles the time window, e.g. rate(metric[5m]).
+
+    For range queries, provide `query`, `start`, and `end` as Unix epoch seconds
+    (e.g. start="1700000000", end="1700003600") and optionally `step` (default '15s').
+    Relative strings like '1h' are NOT valid — use Unix timestamps only.
     """
     try:
         async with _make_client() as client:
