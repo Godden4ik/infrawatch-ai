@@ -21,14 +21,8 @@ mcp = FastMCP(
     ),
 )
 
-_client: httpx.AsyncClient | None = None
-
-
-async def _get_client() -> httpx.AsyncClient:
-    global _client
-    if _client is None:
-        _client = httpx.AsyncClient(base_url=PROMETHEUS_URL, timeout=30.0)
-    return _client
+def _make_client() -> httpx.AsyncClient:
+    return httpx.AsyncClient(base_url=PROMETHEUS_URL, timeout=30.0)
 
 
 @mcp.tool()
@@ -44,15 +38,15 @@ async def execute_promql(
     For range queries, provide `query`, `start`, `end` (ISO timestamps or relative like '1h'),
     and optionally `step` (default '15s').
     """
-    client = await _get_client()
     try:
-        if start and end:
-            params = {"query": query, "start": start, "end": end, "step": step or "15s"}
-            resp = await client.get("/api/v1/query_range", params=params)
-        else:
-            resp = await client.get("/api/v1/query", params={"query": query})
-        resp.raise_for_status()
-        return json.dumps(resp.json()["data"], indent=2)
+        async with _make_client() as client:
+            if start and end:
+                params = {"query": query, "start": start, "end": end, "step": step or "15s"}
+                resp = await client.get("/api/v1/query_range", params=params)
+            else:
+                resp = await client.get("/api/v1/query", params={"query": query})
+            resp.raise_for_status()
+            return json.dumps(resp.json()["data"], indent=2)
     except httpx.HTTPStatusError as e:
         return json.dumps({"error": f"Prometheus returned {e.response.status_code}", "detail": e.response.text})
     except httpx.ConnectError:
@@ -62,11 +56,11 @@ async def execute_promql(
 @mcp.tool()
 async def list_metrics() -> str:
     """List all available Prometheus metric names."""
-    client = await _get_client()
     try:
-        resp = await client.get("/api/v1/label/__name__/values")
-        resp.raise_for_status()
-        return json.dumps(resp.json()["data"], indent=2)
+        async with _make_client() as client:
+            resp = await client.get("/api/v1/label/__name__/values")
+            resp.raise_for_status()
+            return json.dumps(resp.json()["data"], indent=2)
     except httpx.HTTPStatusError as e:
         return json.dumps({"error": f"Prometheus returned {e.response.status_code}", "detail": e.response.text})
     except httpx.ConnectError:
@@ -76,22 +70,22 @@ async def list_metrics() -> str:
 @mcp.tool()
 async def get_targets() -> str:
     """Get Prometheus scrape target health status for all monitored services."""
-    client = await _get_client()
     try:
-        resp = await client.get("/api/v1/targets")
-        resp.raise_for_status()
-        data = resp.json()["data"]
-        targets = [
-            {
-                "job": t["labels"].get("job"),
-                "instance": t["labels"].get("instance"),
-                "health": t["health"],
-                "lastScrape": t.get("lastScrape"),
-                "lastError": t.get("lastError", ""),
-            }
-            for t in data.get("activeTargets", [])
-        ]
-        return json.dumps(targets, indent=2)
+        async with _make_client() as client:
+            resp = await client.get("/api/v1/targets")
+            resp.raise_for_status()
+            data = resp.json()["data"]
+            targets = [
+                {
+                    "job": t["labels"].get("job"),
+                    "instance": t["labels"].get("instance"),
+                    "health": t["health"],
+                    "lastScrape": t.get("lastScrape"),
+                    "lastError": t.get("lastError", ""),
+                }
+                for t in data.get("activeTargets", [])
+            ]
+            return json.dumps(targets, indent=2)
     except httpx.HTTPStatusError as e:
         return json.dumps({"error": f"Prometheus returned {e.response.status_code}", "detail": e.response.text})
     except httpx.ConnectError:

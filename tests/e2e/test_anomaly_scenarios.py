@@ -86,18 +86,22 @@ def test_cascade_failure_affects_multiple_services(client):
     for service, anomaly in inject_map.items():
         client.post(f"{SERVICE_URLS[service]}/inject", params={"anomaly_type": anomaly})
 
-    # Wait for metrics to propagate
-    time.sleep(5)
-
     try:
+        # Wait for metrics to propagate (gauge updates on next simulator tick)
+        deadline = time.time() + 15
+        while time.time() < deadline:
+            gw_results = promql(client, "gateway_error_rate")
+            if gw_results and float(gw_results[0]["value"][1]) > 0.20:
+                break
+            time.sleep(2)
+
         # Gateway should show elevated error rate
-        gw_results = promql(client, "gateway_error_rate")
         assert gw_results, "No gateway_error_rate metric found"
         assert float(gw_results[0]["value"][1]) > 0.20
 
         # Redis memory usage should be climbing — just verify metric exists and > 0
-        redis_results = promql(client, "cache_memory_used_bytes")
-        assert redis_results, "No cache_memory_used_bytes metric found"
+        redis_results = promql(client, "redis_memory_used_bytes")
+        assert redis_results, "No redis_memory_used_bytes metric found"
         assert float(redis_results[0]["value"][1]) > 0
 
     finally:

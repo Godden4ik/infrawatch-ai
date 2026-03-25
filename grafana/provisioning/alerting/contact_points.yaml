@@ -1,0 +1,14 @@
+# InfraWatch alerting: Discord is the only contact point (main destination for all alerts).
+# Set DISCORD_WEBHOOK_URL in Grafana's environment (e.g. in docker-compose) to your Discord channel webhook URL.
+apiVersion: 1
+
+contactPoints:
+  - orgId: 1
+    name: infrawatch-discord
+    receivers:
+      - uid: infrawatch_discord
+        type: discord
+        disableResolveMessage: false
+        settings:
+          # Set DISCORD_WEBHOOK_URL in Grafana env (e.g. in docker-compose) to your Discord channel webhook URL.
+          url: placeholder
