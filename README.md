@@ -5,11 +5,9 @@ AI-powered infrastructure monitoring system using MCP, LangGraph multi-agent orc
 ## Architecture
 
 ```
-(agents are yet to be implemented)
 Monitor Agent → Analyst Agent → Responder Agent
       ↓               ↓               ↓
 Prometheus MCP    Neo4j MCP      Grafana MCP
-   (done)          (done)          (done)
 ```
 
 Five simulated microservices emit Prometheus metrics. Agents detect anomalies, trace root causes through a Neo4j dependency graph, and draft remediation actions.
@@ -25,7 +23,10 @@ docker compose up
 # 2. Seed the Neo4j topology graph (first time only)
 python graph/seed.py
 
-# 3. Open dashboards
+# 3. Ingest runbooks + incidents into knowledge base (local embeddings, no API key needed)
+python graph/ingest.py
+
+# 4. Open dashboards
 #   Grafana:    http://localhost:3000  (admin / infrawatch)
 #   Prometheus: http://localhost:9090
 #   Neo4j:      http://localhost:7474  (neo4j / infrawatch)
@@ -70,7 +71,7 @@ Three FastMCP servers expose infrastructure tools to agents via stdio transport:
 |--------|-------|------|
 | Prometheus | `execute_promql`, `list_metrics`, `get_targets` | `mcp-servers/prometheus_mcp/server.py` |
 | Grafana | `list_dashboards`, `get_dashboard`, `get_panel`, `list_alerts` | `mcp-servers/grafana_mcp/server.py` |
-| Neo4j | `run_cypher`, `get_service_dependencies`, `get_blast_radius` | `mcp-servers/neo4j_mcp/server.py` |
+| Neo4j | `run_cypher`, `get_service_dependencies`, `get_blast_radius`, `search_runbooks`, `find_similar_incidents`, `get_runbook_for_service`, `search_knowledge_base` | `mcp-servers/neo4j_mcp/server.py` |
 
 Connection URLs are configured via environment variables (defaults to localhost):
 
@@ -107,8 +108,9 @@ mcp-servers/
   prometheus_mcp/      PromQL queries, metric listing, target health
   grafana_mcp/         Dashboard/panel queries, alert listing
   neo4j_mcp/           Cypher queries, dependency traversal, blast radius
-agents/                LangGraph agents: Monitor, Analyst, Responder (TODO)
-graph/                 Neo4j schema + seed script
+agents/                LangGraph agents: Monitor, Analyst, Responder
+graph/                 Neo4j schema, seed, ingestion, GraphRAG retrieval
+  data/                Runbooks, incidents, symptoms YAML corpus
 ui/                    Streamlit dashboard (TODO)
 tests/
   unit/                No external dependencies (26 tests)
@@ -116,6 +118,7 @@ tests/
   e2e/                 Full stack scenarios with Prometheus validation (4 tests)
 scripts/
   inject_anomaly.py    Anomaly injection CLI
+  evaluate_rag.py      GraphRAG vs Naive RAG comparison
 prometheus/            prometheus.yml scrape config
 grafana/               Provisioned datasources and dashboards
 ```

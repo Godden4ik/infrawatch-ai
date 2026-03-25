@@ -1,0 +1,269 @@
+runbooks:
+  - id: RB-001
+    title: "Redis Cache Failure Recovery"
+    category: cache
+    severity: P1
+    author: platform-team
+    applies_to:
+      - redis-cache
+      - payment-service
+      - user-service
+      - order-service
+    steps:
+      - step_number: 1
+        title: "Verify Redis health"
+        content: "Check Redis connectivity and memory usage. Run 'redis-cli ping' and 'redis-cli info memory'. Look for used_memory_peak exceeding maxmemory. Check redis_cache_hit_ratio metric — if below 0.2, Redis is effectively down."
+        references: [redis-cache]
+      - step_number: 2
+        title: "Check dependent service impact"
+        content: "Query Prometheus for error rates on payment-service, user-service, and order-service. These all use Redis for caching or session storage. Expect elevated latency and error rates when Redis is degraded."
+        references: [payment-service, user-service, order-service]
+      - step_number: 3
+        title: "Restart Redis if unresponsive"
+        content: "If Redis is OOM or unresponsive, restart the container: 'docker restart redis-cache'. Monitor redis_cache_hit_ratio recovery — it should climb above 0.8 within 5 minutes as caches warm."
+        references: [redis-cache]
+      - step_number: 4
+        title: "Verify downstream recovery"
+        content: "After Redis recovery, check that payment-service latency returns below 500ms SLO, user-service session errors clear, and order-service cache operations resume. Monitor for 15 minutes before closing."
+        references: [payment-service, user-service, order-service]
+
+  - id: RB-002
+    title: "Payment Service High Latency"
+    category: latency
+    severity: P2
+    author: payments-team
+    applies_to:
+      - payment-service
+      - redis-cache
+    steps:
+      - step_number: 1
+        title: "Measure current latency"
+        content: "Query histogram_quantile(0.95, rate(payment_request_duration_seconds_bucket[5m])). Normal baseline is ~950ms. Anomaly threshold is >2000ms. Check if latency is service-internal or caused by downstream dependency."
+        references: [payment-service]
+      - step_number: 2
+        title: "Check Redis cache dependency"
+        content: "Payment-service uses Redis for transaction caching. If redis_cache_hit_ratio is low, payment-service falls back to slower paths. Check Redis connectivity and memory pressure."
+        references: [redis-cache]
+      - step_number: 3
+        title: "Check order-service call path"
+        content: "Payment-service is called by order-service for charge-customer operations. High payment latency cascades to order timeouts. Check order-service error rates for correlation."
+        references: [payment-service, order-service]
+      - step_number: 4
+        title: "Scale or restart payment-service"
+        content: "If latency is internal (not caused by Redis), restart payment-service container. If load-related, consider scaling horizontally. Verify p95 latency drops below 500ms SLO after action."
+        references: [payment-service]
+
+  - id: RB-003
+    title: "API Gateway Error Rate Spike"
+    category: error
+    severity: P2
+    author: platform-team
+    applies_to:
+      - api-gateway
+      - payment-service
+      - user-service
+      - order-service
+    steps:
+      - step_number: 1
+        title: "Identify error source"
+        content: "Check gateway_error_rate metric. If above 0.05, investigate which backend is returning errors. Query per-route error rates to isolate: /api/payments, /api/users, /api/orders."
+        references: [api-gateway]
+      - step_number: 2
+        title: "Check backend service health"
+        content: "The gateway routes to payment-service, user-service, and order-service. Check each backend's error rate and latency. The root cause is usually in a backend, not the gateway itself."
+        references: [payment-service, user-service, order-service]
+      - step_number: 3
+        title: "Enable circuit breaker if needed"
+        content: "If one backend is consistently failing, the gateway should circuit-break that route to prevent cascade. Temporarily return 503 for the affected route while the backend recovers."
+        references: [api-gateway]
+      - step_number: 4
+        title: "Verify recovery"
+        content: "After backend fix, verify gateway_error_rate drops below 0.05. Check all three route paths return 200s. Monitor for 10 minutes for stability."
+        references: [api-gateway]
+
+  - id: RB-004
+    title: "Redis Memory Leak Mitigation"
+    category: memory
+    severity: P2
+    author: platform-team
+    applies_to:
+      - redis-cache
+    steps:
+      - step_number: 1
+        title: "Detect memory growth pattern"
+        content: "Monitor process_resident_memory_bytes for redis-cache over 1h window. A steady upward trend without corresponding traffic increase indicates a memory leak. Check used_memory vs maxmemory ratio."
+        references: [redis-cache]
+      - step_number: 2
+        title: "Identify large keys"
+        content: "Use redis-cli --bigkeys to find unexpectedly large keys. Check if session keys from user-service or transaction-cache keys from payment-service are not expiring properly."
+        references: [redis-cache]
+      - step_number: 3
+        title: "Flush expired keys and set TTLs"
+        content: "Run SCAN + TTL check to find keys without expiration. Set reasonable TTLs: session keys 30m, transaction-cache 5m, order-queue-cache 10m. This prevents unbounded growth."
+        references: [redis-cache]
+      - step_number: 4
+        title: "Monitor after mitigation"
+        content: "After setting TTLs, monitor memory usage for 1 hour. Memory should stabilize or decrease. If it continues growing, escalate to a Redis version upgrade or configuration review."
+        references: [redis-cache]
+
+  - id: RB-005
+    title: "Order Service Timeout Resolution"
+    category: latency
+    severity: P2
+    author: commerce-team
+    applies_to:
+      - order-service
+      - payment-service
+      - user-service
+    steps:
+      - step_number: 1
+        title: "Measure order-service latency"
+        content: "Query histogram_quantile(0.95, rate(order_request_duration_seconds_bucket[5m])). Normal baseline is ~2400ms (it's the slowest service). Anomaly at >5000ms. Order-service calls both payment-service and user-service."
+        references: [order-service]
+      - step_number: 2
+        title: "Check downstream dependencies"
+        content: "Order-service calls payment-service (charge-customer) and user-service (verify-user). If either is slow, order-service latency compounds. Check both downstream services' p95 latency."
+        references: [payment-service, user-service]
+      - step_number: 3
+        title: "Check Redis cache"
+        content: "Order-service uses redis-cache for order-queue-cache (non-critical). If Redis is down, order-service should still function but may be slower. Verify Redis health."
+        references: [redis-cache]
+      - step_number: 4
+        title: "Restart or scale"
+        content: "If timeout is internal to order-service, restart the container. If caused by downstream, fix the root cause first. Verify order processing resumes with p95 under 3000ms."
+        references: [order-service]
+
+  - id: RB-006
+    title: "User Service Auth Failures"
+    category: error
+    severity: P1
+    author: identity-team
+    applies_to:
+      - user-service
+      - redis-cache
+    steps:
+      - step_number: 1
+        title: "Check authentication error rate"
+        content: "Query user-service error rate and specifically auth-related failures. User-service handles authentication and session management. An auth failure spike usually indicates session store issues."
+        references: [user-service]
+      - step_number: 2
+        title: "Verify Redis session store"
+        content: "User-service uses Redis as its session store (critical dependency). If Redis is down or slow, all session lookups fail, causing auth errors. Check redis-cache health and connectivity."
+        references: [redis-cache]
+      - step_number: 3
+        title: "Check API gateway impact"
+        content: "Auth failures in user-service propagate to api-gateway as 401/403 errors. Check gateway error rate for correlation. Users will experience login failures."
+        references: [api-gateway]
+      - step_number: 4
+        title: "Restore sessions"
+        content: "If Redis was restarted and sessions were lost, users need to re-authenticate. This is expected behavior. Monitor auth success rate recovery over 15 minutes."
+        references: [user-service, redis-cache]
+
+  - id: RB-007
+    title: "Cascade Failure Response Playbook"
+    category: cascade
+    severity: P1
+    author: platform-team
+    applies_to:
+      - api-gateway
+      - payment-service
+      - user-service
+      - order-service
+      - redis-cache
+    steps:
+      - step_number: 1
+        title: "Identify the cascade origin"
+        content: "In a cascade failure, multiple services degrade simultaneously. The root cause is usually a shared dependency. Check redis-cache first — it's the most common cascade origin because payment-service, user-service, and order-service all depend on it."
+        references: [redis-cache]
+      - step_number: 2
+        title: "Assess blast radius"
+        content: "Use get_blast_radius to determine all affected services. A redis-cache failure affects all 4 upstream services. A payment-service failure affects order-service and api-gateway. Map the full impact."
+        references: [api-gateway, payment-service, user-service, order-service, redis-cache]
+      - step_number: 3
+        title: "Fix root cause first"
+        content: "Always fix the root cause (usually the deepest node in the dependency chain) before addressing symptoms. Restarting upstream services while the root cause persists will just cause re-failure."
+        references: [redis-cache]
+      - step_number: 4
+        title: "Verify cascade recovery"
+        content: "After fixing root cause, monitor all services in dependency order: redis-cache first, then payment/user/order services, then api-gateway. Each should recover within 2-5 minutes."
+        references: [redis-cache, payment-service, user-service, order-service, api-gateway]
+      - step_number: 5
+        title: "Post-incident review"
+        content: "Document the cascade chain, time to detect, time to resolve. Identify if circuit breakers or timeouts could have limited the blast radius. Update monitoring thresholds if detection was slow."
+        references: []
+
+  - id: RB-008
+    title: "Capacity Planning for Redis"
+    category: capacity
+    severity: P3
+    author: platform-team
+    applies_to:
+      - redis-cache
+    steps:
+      - step_number: 1
+        title: "Collect baseline metrics"
+        content: "Gather 7-day averages for: redis memory usage, connection count, cache hit ratio, operations per second. These establish the baseline for capacity modeling."
+        references: [redis-cache]
+      - step_number: 2
+        title: "Project growth trends"
+        content: "Calculate weekly growth rate for memory and connection count. If memory grows >10% weekly, Redis will hit maxmemory within a predictable timeframe. Plan scaling before that point."
+        references: [redis-cache]
+      - step_number: 3
+        title: "Recommend scaling action"
+        content: "If memory is projected to exceed 80% of maxmemory within 4 weeks, increase maxmemory or provision a larger Redis instance. If connection count approaches limits, consider connection pooling in payment-service and user-service."
+        references: [redis-cache, payment-service, user-service]
+
+  - id: RB-009
+    title: "Database Fallback Procedures"
+    category: degradation
+    severity: P2
+    author: platform-team
+    applies_to:
+      - payment-service
+      - order-service
+    steps:
+      - step_number: 1
+        title: "Detect degraded mode trigger"
+        content: "When Redis is unavailable, payment-service and order-service should switch to degraded mode — bypassing cache and operating with higher latency. Monitor for degraded-mode metrics."
+        references: [payment-service, order-service]
+      - step_number: 2
+        title: "Verify fallback path"
+        content: "In degraded mode, payment-service processes transactions without Redis transaction-cache (slower but functional). Order-service skips queue-cache. Verify both services remain functional."
+        references: [payment-service, order-service]
+      - step_number: 3
+        title: "Monitor degraded performance"
+        content: "Expect 2-3x latency increase in degraded mode. Set temporary relaxed SLO thresholds. Alert if latency exceeds degraded-mode thresholds (payment >3000ms, order >8000ms)."
+        references: [payment-service, order-service]
+      - step_number: 4
+        title: "Return to normal mode"
+        content: "Once Redis recovers, services should automatically reconnect and resume caching. Verify cache hit ratios climb back to normal (>0.8) within 10 minutes."
+        references: [redis-cache, payment-service, order-service]
+
+  - id: RB-010
+    title: "Full Stack Health Check"
+    category: monitoring
+    severity: P3
+    author: platform-team
+    applies_to:
+      - api-gateway
+      - payment-service
+      - user-service
+      - order-service
+      - redis-cache
+    steps:
+      - step_number: 1
+        title: "Check all service endpoints"
+        content: "Hit /health on each service: api-gateway:8080, payment-service:8001, user-service:8002, order-service:8003, redis-cache:8004. All should return 200 with status 'healthy'."
+        references: [api-gateway, payment-service, user-service, order-service, redis-cache]
+      - step_number: 2
+        title: "Verify Prometheus scraping"
+        content: "Check Prometheus targets page (localhost:9090/targets). All 5 service targets should show state 'up'. If any target is down, check service health and network connectivity."
+        references: []
+      - step_number: 3
+        title: "Check key metrics are within SLO"
+        content: "Verify: api-gateway p95 <100ms, payment-service p95 <500ms, user-service p95 <50ms, order-service p95 <300ms. Check redis_cache_hit_ratio >0.8. Check all error rates below SLO thresholds."
+        references: [api-gateway, payment-service, user-service, order-service, redis-cache]
+      - step_number: 4
+        title: "Verify Neo4j topology"
+        content: "Confirm Neo4j is accessible at bolt://localhost:7687. Run 'MATCH (s:Service) RETURN count(s)' — should return 5. Verify dependency relationships are intact."
+        references: []

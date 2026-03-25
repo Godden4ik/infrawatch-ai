@@ -16,5 +16,7 @@ class PipelineState(TypedDict):
     blast_radius: list[dict]  # [{service, impact_level, slo_at_risk}]
     confidence: float  # 0.0–1.0
     remediation_plan: str
+    relevant_runbooks: list[dict]  # GraphRAG runbook search results
+    similar_incidents: list[dict]  # Historical incident matches
     has_anomalies: bool
     iteration: int  # loop guard (max 2)
