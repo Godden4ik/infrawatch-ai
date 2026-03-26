@@ -5,7 +5,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from api_backend.routes import health, pipeline, graph, anomaly, rag
+from api_backend.routes import health, pipeline, graph, anomaly, rag, models
 
 
 @asynccontextmanager
@@ -27,3 +27,4 @@ app.include_router(pipeline.router, prefix="/pipeline", tags=["pipeline"])
 app.include_router(graph.router, prefix="/graph", tags=["graph"])
 app.include_router(anomaly.router, prefix="/anomaly", tags=["anomaly"])
 app.include_router(rag.router, prefix="/rag", tags=["rag"])
+app.include_router(models.router, prefix="/models", tags=["models"])
