@@ -107,7 +107,7 @@ export function PipelineControls() {
                 No models installed. Run <code className="font-mono">ollama pull</code> first.
               </div>
             ) : (
-              <Select value={ollamaModel} onValueChange={setOllamaModel}>
+              <Select value={ollamaModel} onValueChange={(v) => setOllamaModel(v ?? "")}>
                 <SelectTrigger className="w-full">
                   <SelectValue placeholder="Select a model" />
                 </SelectTrigger>
