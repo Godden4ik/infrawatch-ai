@@ -38,7 +38,7 @@ PROVIDER_REGISTRY: dict[str, dict[str, Any]] = {
         ],
     },
     "google": {
-        "name": "Google",
+        "name": "Gemini",
         "module": "langchain_google_genai",
         "class": "ChatGoogleGenerativeAI",
         "key_env": "GOOGLE_API_KEY",

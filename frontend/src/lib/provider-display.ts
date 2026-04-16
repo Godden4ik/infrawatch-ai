@@ -1,9 +1,10 @@
 import { BrainCircuit } from "lucide-react";
-import { Anthropic, OpenAI, Google, Ollama } from "@lobehub/icons";
+import Anthropic from "@lobehub/icons/es/Anthropic";
+import OpenAI from "@lobehub/icons/es/OpenAI";
+import Gemini from "@lobehub/icons/es/Gemini";
+import Ollama from "@lobehub/icons/es/Ollama";
 import type { FC } from "react";
 
-// IconType from @lobehub/icons is a React FC that accepts size, style, className
-// We use a compatible signature accepted by both lobehub icons and lucide icons.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export type ProviderIconComponent = FC<any>;
 
@@ -21,11 +22,11 @@ const PROVIDER_DISPLAY: Record<string, ProviderDisplay> = {
   },
   openai: {
     icon: OpenAI,
-    color: "#10A37F",
+    color: "#FFFFFF",
     description: "GPT models",
   },
   google: {
-    icon: Google,
+    icon: Gemini.Color,
     color: "#4285F4",
     description: "Gemini models",
   },
