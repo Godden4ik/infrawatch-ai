@@ -14,7 +14,7 @@ Adapted from Salon Svitlo CRM architecture guidelines.
 | Service Health | `/dashboard` | **C — Hybrid** | Stat cards + nivo time-series charts per service |
 | Anomaly Injection | `/anomaly` | **B — Bento** | Scenario buttons + inject form + active anomalies |
 | Agent Pipeline | `/pipeline` | **D — Split-pane** | Controls sidebar + streaming agent output |
-| Topology | `/topology` | **B — Bento** | Interactive graph + blast radius panel |
+| Topology | `/topology` | **D — Split-pane** | ReactFlow graph (90° orthogonal edges, dotted animated) + blast radius panel |
 | RAG Evaluation | `/evaluation` | **C — Hybrid** | Query form + comparison charts + results |
 
 ---
@@ -93,6 +93,23 @@ InfraWatch is a monitoring tool. Every pixel should earn its place.
 6. **Maximize viewport**: pages should fill the viewport, not float in empty space.
 
 ---
+
+## Topology Graph Standards (ReactFlow)
+
+- **Edge type**: `smoothstep` with sharp corners (90-degree orthogonal connections)
+- **Edge style**: dotted stroke (`strokeDasharray: "6 4"`) with CSS animation for flow direction
+- **Edge animation**: `@keyframes dash-flow` — `stroke-dashoffset` animates to create moving dots along edges
+- **Node style**: sharp corners matching `--radius` token, dark bg, monospace service name, status indicator dot
+- **Node handles**: hidden or minimal — no visible connection points
+- **Layout**: dagre or manual hierarchical — API gateway at top, dependencies flow down
+- **Blast radius**: affected nodes glow with destructive color, edges to affected nodes pulse faster
+- **Controls**: minimal — zoom buttons, fit-view. No minimap (too small to be useful).
+
+## Border Radius — Sharp Industrial
+
+All components use `--radius: 0.375rem` (6px). This is intentional — monitoring tools need sharp, industrial aesthetics. Never override with `rounded-lg`, `rounded-xl`, or `rounded-full` on structural elements.
+
+Exception: status dots (`rounded-full`) and avatars.
 
 ## Chart Standards (nivo)
 
