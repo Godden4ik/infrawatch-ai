@@ -2,12 +2,13 @@
 
 import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { Loader2, Radar, ShieldAlert, Syringe, Zap } from "lucide-react";
+import { Loader2, Radar, ShieldAlert, Syringe } from "lucide-react";
 import { injectAnomaly } from "@/services/anomaly/actions";
 import { unwrap } from "@/services/_shared/safe-action";
 import { ANOMALY_TYPES, SERVICES } from "@/services/anomaly/schema";
 import { healthKeys } from "@/services/health/query-options";
 import type { HealthResponse } from "@/services/health/schema";
+import { toast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -61,6 +62,14 @@ const ANOMALY_COPY: Record<
   },
 };
 
+const SERVICE_LABELS: Record<string, string> = {
+  "api-gateway": "API Gateway",
+  "payment-service": "Payment Service",
+  "user-service": "User Service",
+  "order-service": "Order Service",
+  "redis-cache": "Redis Cache",
+};
+
 function buildEventId(prefix: string) {
   return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 }
@@ -95,6 +104,7 @@ export function InjectForm({
   const selectedActiveInjection = activeInjections.find(
     (entry) => entry.service === service,
   );
+  const selectedServiceLabel = SERVICE_LABELS[service] ?? service;
 
   const mutation = useMutation({
     mutationFn: async () => {
@@ -109,6 +119,7 @@ export function InjectForm({
     },
     onSuccess: (data) => {
       void queryClient.invalidateQueries({ queryKey: healthKeys.all });
+      toast.success(`Injection accepted for ${selectedServiceLabel}.`);
       onInjected({
         id: buildEventId("inject"),
         kind: "inject",
@@ -118,6 +129,9 @@ export function InjectForm({
         status: data.status ?? "injected",
         timestamp: Date.now(),
       });
+    },
+    onError: (error) => {
+      toast.error(error.message);
     },
   });
 
@@ -151,7 +165,9 @@ export function InjectForm({
               }}
             >
               <SelectTrigger className="w-full">
-                <SelectValue placeholder="Select service" />
+                <span className="truncate">
+                  {selectedServiceLabel || "Select service"}
+                </span>
               </SelectTrigger>
               <SelectContent align="start">
                 <SelectGroup>
@@ -159,7 +175,9 @@ export function InjectForm({
                   {SERVICES.map((entry) => (
                     <SelectItem key={entry} value={entry}>
                       <div className="flex w-full items-center justify-between gap-3">
-                        <span className="font-mono">{entry}</span>
+                        <span className="font-mono">
+                          {SERVICE_LABELS[entry] ?? entry}
+                        </span>
                         <span className="flex items-center gap-1.5 text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
                           <span
                             className={cn(
@@ -188,7 +206,9 @@ export function InjectForm({
               }}
             >
               <SelectTrigger className="w-full">
-                <SelectValue placeholder="Select anomaly" />
+                <span className="truncate">
+                  {selectedAnomaly.label || "Select anomaly"}
+                </span>
               </SelectTrigger>
               <SelectContent align="start">
                 <SelectGroup>
@@ -214,7 +234,7 @@ export function InjectForm({
             <div className="flex items-center justify-between gap-2">
               <div className="flex items-center gap-2">
                 <Radar className="h-3.5 w-3.5 text-primary" />
-                <span className="font-mono text-xs">{service}</span>
+                <span className="font-mono text-xs">{selectedServiceLabel}</span>
               </div>
               <Badge variant="outline" className="font-mono text-[10px] uppercase">
                 {statusLabel(selectedStatus)}
@@ -268,19 +288,6 @@ export function InjectForm({
           )}
           Inject anomaly
         </Button>
-
-        {mutation.isSuccess ? (
-          <div className="flex items-center gap-2 bg-emerald-500/10 px-3 py-2 font-mono text-[11px] text-emerald-500 ring-1 ring-inset ring-emerald-500/20">
-            <Zap className="h-3.5 w-3.5" />
-            Injection accepted for {service}
-          </div>
-        ) : null}
-
-        {mutation.isError ? (
-          <div className="bg-destructive/10 px-3 py-2 font-mono text-[11px] text-destructive ring-1 ring-inset ring-destructive/20">
-            {mutation.error.message}
-          </div>
-        ) : null}
       </CardContent>
     </Card>
   );

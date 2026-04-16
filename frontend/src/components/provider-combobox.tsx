@@ -12,7 +12,6 @@ import {
   SelectItem,
   SelectLabel,
   SelectTrigger,
-  SelectValue,
 } from "@/components/ui/select";
 import { Loader2 } from "lucide-react";
 
@@ -131,6 +130,7 @@ export function ProviderCombobox({
   const selectedDisplay = activeProvider
     ? getProviderDisplay(activeProvider.id)
     : null;
+  const activeModel = activeProvider?.models.find((model) => model.id === value.model);
 
   return (
     <div className="space-y-3">
@@ -154,7 +154,9 @@ export function ProviderCombobox({
                   style={{ color: selectedDisplay?.color }}
                 />
               ) : null}
-              <SelectValue placeholder="Select provider" />
+              <span className="truncate">
+                {activeProvider?.name ?? "Select provider"}
+              </span>
             </div>
           </SelectTrigger>
           <SelectContent>
@@ -197,7 +199,9 @@ export function ProviderCombobox({
             }}
           >
             <SelectTrigger className="w-full">
-              <SelectValue placeholder="Select model" />
+              <span className="truncate">
+                {activeModel?.name ?? "Select model"}
+              </span>
             </SelectTrigger>
             <SelectContent>
               <SelectGroup>

@@ -21,7 +21,6 @@ import {
   SelectItem,
   SelectLabel,
   SelectTrigger,
-  SelectValue,
 } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -145,6 +144,7 @@ export function ProviderSelector({
   const needsKey =
     !!activeProvider?.requires_key && !activeProvider?.available && !storedKey;
   const hasModels = activeProvider && activeProvider.models.length > 0;
+  const activeModel = activeProvider?.models.find((model) => model.id === value.model);
 
   return (
     <div className="space-y-3">
@@ -225,7 +225,9 @@ export function ProviderSelector({
             onValueChange={(m) => m && onChange({ ...value, model: m })}
           >
             <SelectTrigger className="w-full">
-              <SelectValue placeholder="Select a model" />
+              <span className="truncate">
+                {activeModel?.name ?? "Select a model"}
+              </span>
             </SelectTrigger>
             <SelectContent>
               <SelectGroup>

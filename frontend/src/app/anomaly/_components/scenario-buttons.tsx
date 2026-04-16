@@ -5,6 +5,7 @@ import { Flame, Loader2, RotateCcw, Workflow } from "lucide-react";
 import { injectScenario, resetAnomalies } from "@/services/anomaly/actions";
 import { unwrap } from "@/services/_shared/safe-action";
 import { healthKeys } from "@/services/health/query-options";
+import { toast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -51,6 +52,7 @@ export function ScenarioButtons({
     },
     onSuccess: (data) => {
       void queryClient.invalidateQueries({ queryKey: healthKeys.all });
+      toast.success("Cascade scenario accepted.");
 
       const events =
         data.results
@@ -76,6 +78,9 @@ export function ScenarioButtons({
 
       onScenarioInjected(events);
     },
+    onError: (error) => {
+      toast.error(error.message);
+    },
   });
 
   const resetMutation = useMutation({
@@ -91,7 +96,11 @@ export function ScenarioButtons({
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: healthKeys.all });
+      toast.success("Reset issued across all services.");
       onReset();
+    },
+    onError: (error) => {
+      toast.error(error.message);
     },
   });
 
@@ -181,30 +190,6 @@ export function ScenarioButtons({
             Reset all services
           </Button>
         </div>
-
-        {cascadeMutation.isSuccess ? (
-          <div className="bg-emerald-500/10 px-3 py-2 font-mono text-[11px] text-emerald-500 ring-1 ring-inset ring-emerald-500/20">
-            Cascade scenario accepted.
-          </div>
-        ) : null}
-
-        {resetMutation.isSuccess ? (
-          <div className="bg-emerald-500/10 px-3 py-2 font-mono text-[11px] text-emerald-500 ring-1 ring-inset ring-emerald-500/20">
-            Reset issued across all services.
-          </div>
-        ) : null}
-
-        {cascadeMutation.isError ? (
-          <div className="bg-destructive/10 px-3 py-2 font-mono text-[11px] text-destructive ring-1 ring-inset ring-destructive/20">
-            {cascadeMutation.error.message}
-          </div>
-        ) : null}
-
-        {resetMutation.isError ? (
-          <div className="bg-destructive/10 px-3 py-2 font-mono text-[11px] text-destructive ring-1 ring-inset ring-destructive/20">
-            {resetMutation.error.message}
-          </div>
-        ) : null}
       </CardContent>
     </Card>
   );
