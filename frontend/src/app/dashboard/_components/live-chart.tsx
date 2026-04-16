@@ -104,7 +104,7 @@ export function LiveChart({ label, points, colorVar, format }: LiveChartProps) {
               areaOpacity={0.12}
               enableGridX={false}
               enableGridY
-              motionConfig="gentle"
+              animate={false}
               theme={nivoTheme}
               enableCrosshair
               isInteractive
