@@ -4,6 +4,7 @@ import "./globals.css"
 import { Providers } from "@/providers/providers"
 import { SidebarProvider } from "@/components/ui/sidebar"
 import { AppSidebar } from "@/components/layout/app-sidebar"
+import { ToastProvider } from "@/components/ui/toast-provider"
 import { cn } from "@/lib/utils";
 
 const fontSans = Geist({
@@ -29,10 +30,12 @@ export default function RootLayout({
     >
       <body>
         <Providers>
-          <SidebarProvider>
-            <AppSidebar />
-            <main className="flex-1 overflow-auto px-8 py-7">{children}</main>
-          </SidebarProvider>
+          <ToastProvider>
+            <SidebarProvider>
+              <AppSidebar />
+              <main className="flex-1 overflow-auto px-8 py-7">{children}</main>
+            </SidebarProvider>
+          </ToastProvider>
         </Providers>
       </body>
     </html>
