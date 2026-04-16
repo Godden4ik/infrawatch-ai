@@ -1,91 +1,50 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import { motion } from "motion/react";
-import { useQueries } from "@tanstack/react-query";
-import { Activity, Clock3 } from "lucide-react";
-import { metricsRangeQueryOptions } from "@/services/metrics/query-options";
-import type { MetricPoint } from "@/services/metrics/schema";
+import { Activity, Radio } from "lucide-react";
+import type { StreamPoint } from "@/hooks/use-metrics-stream";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { MetricChart } from "./metric-chart";
 import { Skeleton } from "@/components/ui/skeleton";
 
-type ServiceConfig = {
-  latency: string;
-  requestRate: string;
-  errorRate: string;
-};
-
 type MetricDefinition = {
-  key: "latency" | "requestRate" | "errorRate";
+  key: string;
   title: string;
-  query: string;
+  streamKey: string;
   color: string;
   areaColor: string;
   formatValue: (value: number) => string;
 };
 
-const SERVICE_METRICS: Record<string, ServiceConfig> = {
-  "api-gateway": {
-    latency: `histogram_quantile(0.95, rate(gateway_request_duration_seconds_bucket[5m]))`,
-    requestRate: `rate(gateway_requests_total[5m])`,
-    errorRate: `rate(gateway_requests_total{status="5xx"}[5m])`,
-  },
-  "payment-service": {
-    latency: `histogram_quantile(0.95, rate(payment_processing_duration_seconds_bucket[5m]))`,
-    requestRate: `rate(payment_transactions_total[5m])`,
-    errorRate: `rate(payment_transactions_total{status="failed"}[5m])`,
-  },
-  "user-service": {
-    latency: `histogram_quantile(0.95, rate(user_request_duration_seconds_bucket[5m]))`,
-    requestRate: `rate(user_auth_attempts_total[5m])`,
-    errorRate: `rate(user_auth_attempts_total{result="failure"}[5m])`,
-  },
-  "order-service": {
-    latency: `histogram_quantile(0.95, rate(order_processing_duration_seconds_bucket[5m]))`,
-    requestRate: `rate(order_processed_total[5m])`,
-    errorRate: `rate(order_errors_total[5m])`,
-  },
-  "redis-cache": {
-    latency: `redis_cache_hit_ratio`,
-    requestRate: `rate(redis_cache_hits_total[5m])`,
-    errorRate: `rate(redis_cache_misses_total[5m])`,
-  },
+/** Maps each service to its 3 sparkline metrics and corresponding SSE stream keys */
+const SERVICE_SPARKLINES: Record<string, MetricDefinition[]> = {
+  "api-gateway": [
+    { key: "latency", title: "P95 Latency", streamKey: "p95_latency", color: "#4ade80", areaColor: "rgba(74, 222, 128, 0.18)", formatValue: formatLatency },
+    { key: "requestRate", title: "Request Rate", streamKey: "request_rate", color: "#4ade80", areaColor: "rgba(74, 222, 128, 0.18)", formatValue: formatPerSecond },
+    { key: "errorRate", title: "Error Rate", streamKey: "error_rate", color: "#4ade80", areaColor: "rgba(74, 222, 128, 0.18)", formatValue: formatPerSecond },
+  ],
+  "payment-service": [
+    { key: "latency", title: "P95 Latency", streamKey: "p95_latency", color: "#4ade80", areaColor: "rgba(74, 222, 128, 0.18)", formatValue: formatLatency },
+    { key: "requestRate", title: "Transaction Rate", streamKey: "transaction_rate", color: "#4ade80", areaColor: "rgba(74, 222, 128, 0.18)", formatValue: formatPerSecond },
+    { key: "errorRate", title: "Failure Rate", streamKey: "failure_rate", color: "#4ade80", areaColor: "rgba(74, 222, 128, 0.18)", formatValue: formatRatio },
+  ],
+  "user-service": [
+    { key: "latency", title: "P95 Latency", streamKey: "p95_latency", color: "#4ade80", areaColor: "rgba(74, 222, 128, 0.18)", formatValue: formatLatency },
+    { key: "requestRate", title: "Auth Rate", streamKey: "auth_rate", color: "#4ade80", areaColor: "rgba(74, 222, 128, 0.18)", formatValue: formatPerSecond },
+    { key: "errorRate", title: "Auth Failures", streamKey: "auth_failure_rate", color: "#4ade80", areaColor: "rgba(74, 222, 128, 0.18)", formatValue: formatPerSecond },
+  ],
+  "order-service": [
+    { key: "latency", title: "P95 Latency", streamKey: "p95_latency", color: "#4ade80", areaColor: "rgba(74, 222, 128, 0.18)", formatValue: formatLatency },
+    { key: "requestRate", title: "Order Rate", streamKey: "order_rate", color: "#4ade80", areaColor: "rgba(74, 222, 128, 0.18)", formatValue: formatPerSecond },
+    { key: "errorRate", title: "Error Rate", streamKey: "error_rate", color: "#4ade80", areaColor: "rgba(74, 222, 128, 0.18)", formatValue: formatPerSecond },
+  ],
+  "redis-cache": [
+    { key: "latency", title: "Hit Ratio", streamKey: "hit_ratio", color: "#4ade80", areaColor: "rgba(74, 222, 128, 0.18)", formatValue: formatRatio },
+    { key: "requestRate", title: "Hits/s", streamKey: "hits_rate", color: "#4ade80", areaColor: "rgba(74, 222, 128, 0.18)", formatValue: formatPerSecond },
+    { key: "errorRate", title: "Misses/s", streamKey: "misses_rate", color: "#4ade80", areaColor: "rgba(74, 222, 128, 0.18)", formatValue: formatPerSecond },
+  ],
 };
-
-const CHART_LABELS: Record<string, { latency: string; requestRate: string; errorRate: string }> = {
-  "redis-cache": { latency: "Hit Ratio", requestRate: "Hits/s", errorRate: "Misses/s" },
-};
-
-function isMetricSeries(data: unknown): data is MetricPoint[] {
-  return (
-    Array.isArray(data) &&
-    data.every(
-      (point) =>
-        !!point &&
-        typeof point === "object" &&
-        typeof point.time === "string" &&
-        typeof point.value === "number" &&
-        Number.isFinite(point.value),
-    )
-  );
-}
-
-function useTimeRange() {
-  const [end, setEnd] = useState(() => Math.floor(Date.now() / 1000));
-
-  useEffect(() => {
-    const intervalId = window.setInterval(() => {
-      setEnd(Math.floor(Date.now() / 1000));
-    }, 60_000);
-
-    return () => window.clearInterval(intervalId);
-  }, []);
-
-  const start = end - 3600;
-  return { start: String(start), end: String(end), step: "60" };
-}
 
 function formatLatency(value: number) {
   if (value >= 1) return `${value.toFixed(2)}s`;
@@ -103,93 +62,19 @@ function formatRatio(value: number) {
   return `${(value * 100).toFixed(1)}%`;
 }
 
-const GREEN_METRIC_COLOR = "#4ade80";
-const GREEN_METRIC_AREA = "rgba(74, 222, 128, 0.18)";
-
-function getMetricDefinitions(serviceName: string, config: ServiceConfig): MetricDefinition[] {
-  const labels = CHART_LABELS[serviceName] ?? {
-    latency: "P95 Latency",
-    requestRate: "Request Rate",
-    errorRate: "Error Rate",
-  };
-
-  if (serviceName === "redis-cache") {
-    return [
-      {
-        key: "latency",
-        title: labels.latency,
-        query: config.latency,
-        color: GREEN_METRIC_COLOR,
-        areaColor: GREEN_METRIC_AREA,
-        formatValue: formatRatio,
-      },
-      {
-        key: "requestRate",
-        title: labels.requestRate,
-        query: config.requestRate,
-        color: GREEN_METRIC_COLOR,
-        areaColor: GREEN_METRIC_AREA,
-        formatValue: formatPerSecond,
-      },
-      {
-        key: "errorRate",
-        title: labels.errorRate,
-        query: config.errorRate,
-        color: GREEN_METRIC_COLOR,
-        areaColor: GREEN_METRIC_AREA,
-        formatValue: formatPerSecond,
-      },
-    ];
-  }
-
-  return [
-    {
-      key: "latency",
-      title: labels.latency,
-      query: config.latency,
-      color: GREEN_METRIC_COLOR,
-      areaColor: GREEN_METRIC_AREA,
-      formatValue: formatLatency,
-    },
-    {
-      key: "requestRate",
-      title: labels.requestRate,
-      query: config.requestRate,
-      color: GREEN_METRIC_COLOR,
-      areaColor: GREEN_METRIC_AREA,
-      formatValue: formatPerSecond,
-    },
-    {
-      key: "errorRate",
-      title: labels.errorRate,
-      query: config.errorRate,
-      color: GREEN_METRIC_COLOR,
-      areaColor: GREEN_METRIC_AREA,
-      formatValue: formatPerSecond,
-    },
-  ];
+interface ServiceMetricsProps {
+  serviceName: string;
+  streamData?: Record<string, StreamPoint[]>;
 }
 
-export function ServiceMetrics({ serviceName }: { serviceName: string }) {
-  const { start, end, step } = useTimeRange();
-  const config = SERVICE_METRICS[serviceName] ?? SERVICE_METRICS["api-gateway"];
-  const isKnownService = serviceName in SERVICE_METRICS;
+export function ServiceMetrics({ serviceName, streamData }: ServiceMetricsProps) {
+  const definitions = SERVICE_SPARKLINES[serviceName];
+  if (!definitions) return null;
+
   const isWideService = serviceName === "redis-cache";
+  const hasData = streamData && Object.values(streamData).some((pts) => pts.length > 0);
 
-  const metricDefinitions = getMetricDefinitions(serviceName, config);
-
-  const metrics = useQueries({
-    queries: metricDefinitions.map((metric) =>
-      metricsRangeQueryOptions(metric.query, start, end, step),
-    ),
-  });
-
-  if (!isKnownService) return null;
-
-  const isLoading = metrics.some((metric) => metric.isPending);
-  const hasError = metrics.some((metric) => metric.isError);
-
-  if (isLoading) {
+  if (!streamData || !hasData) {
     return (
       <Card className="h-full" size="sm">
         <CardHeader className="border-b border-border/60">
@@ -199,7 +84,7 @@ export function ServiceMetrics({ serviceName }: { serviceName: string }) {
               <CardTitle className="font-mono text-sm">{serviceName}</CardTitle>
             </div>
             <Badge variant="outline" className="font-mono text-[11px]">
-              Loading
+              Connecting
             </Badge>
           </div>
         </CardHeader>
@@ -222,10 +107,8 @@ export function ServiceMetrics({ serviceName }: { serviceName: string }) {
               <CardTitle className="font-mono text-sm">{serviceName}</CardTitle>
             </div>
             <div className="flex items-center gap-2 font-mono text-[11px] text-muted-foreground">
-              <Clock3 className="h-3.5 w-3.5" />
-              <span>Last 60m</span>
-              <span className="text-muted-foreground/50">·</span>
-              <span>1m resolution</span>
+              <Radio className="h-3.5 w-3.5" />
+              <span>Live · 2s</span>
             </div>
           </div>
           <Badge
@@ -239,28 +122,22 @@ export function ServiceMetrics({ serviceName }: { serviceName: string }) {
       <CardContent
         className={isWideService ? "grid gap-2 pt-3 lg:grid-cols-3" : "space-y-2 pt-3"}
       >
-        {hasError ? (
-          <div className="border-border bg-background/50 px-3 py-4 font-mono text-xs text-muted-foreground ring-1 ring-inset ring-border/70">
-            Metric stream unavailable.
-          </div>
-        ) : (
-          metricDefinitions.map((metric, index) => (
-            <motion.div
-              key={metric.key}
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.25, delay: index * 0.04 }}
-            >
-              <MetricChart
-                title={metric.title}
-                data={isMetricSeries(metrics[index]?.data) ? metrics[index].data : []}
-                color={metric.color}
-                areaColor={metric.areaColor}
-                formatValue={metric.formatValue}
-              />
-            </motion.div>
-          ))
-        )}
+        {definitions.map((metric, index) => (
+          <motion.div
+            key={metric.key}
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.25, delay: index * 0.04 }}
+          >
+            <MetricChart
+              title={metric.title}
+              data={streamData[metric.streamKey] ?? []}
+              color={metric.color}
+              areaColor={metric.areaColor}
+              formatValue={metric.formatValue}
+            />
+          </motion.div>
+        ))}
       </CardContent>
     </Card>
   );

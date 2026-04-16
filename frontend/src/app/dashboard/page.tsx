@@ -1,6 +1,7 @@
 "use client";
 
 import { motion } from "motion/react";
+import { useMetricsStream } from "@/hooks/use-metrics-stream";
 import { ServiceMetrics } from "./_components/service-metrics";
 import { LiveMonitor } from "./_components/live-monitor";
 import { cn } from "@/lib/utils";
@@ -14,6 +15,8 @@ const SERVICES = [
 ];
 
 export default function DashboardPage() {
+  const { services } = useMetricsStream();
+
   return (
     <div className="space-y-4">
       <motion.div
@@ -26,8 +29,7 @@ export default function DashboardPage() {
             Service Health
           </h1>
           <p className="text-sm text-muted-foreground">
-            Live Prometheus trends with compact sparkline cards across every
-            monitored service
+            Live Prometheus metrics streaming across every monitored service
           </p>
         </div>
         <div className="grid grid-cols-3 gap-2 font-mono text-[11px] text-muted-foreground">
@@ -40,13 +42,13 @@ export default function DashboardPage() {
           <div className="border-border bg-card/50 px-3 py-2 ring-1 ring-inset ring-border/70">
             <div className="tracking-[0.16em] uppercase">Window</div>
             <div className="mt-1 text-sm font-semibold text-foreground">
-              60m
+              5m
             </div>
           </div>
           <div className="border-border bg-card/50 px-3 py-2 ring-1 ring-inset ring-border/70">
-            <div className="tracking-[0.16em] uppercase">Step</div>
+            <div className="tracking-[0.16em] uppercase">Refresh</div>
             <div className="mt-1 text-sm font-semibold text-foreground">
-              1m
+              2s
             </div>
           </div>
         </div>
@@ -65,7 +67,7 @@ export default function DashboardPage() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.35, delay: i * 0.06 }}
           >
-            <ServiceMetrics serviceName={svc} />
+            <ServiceMetrics serviceName={svc} streamData={services[svc]} />
           </motion.div>
         ))}
       </div>
