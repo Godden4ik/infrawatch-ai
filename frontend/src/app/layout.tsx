@@ -1,16 +1,16 @@
-import { Geist_Mono, IBM_Plex_Sans, Merriweather } from "next/font/google"
+import { Geist_Mono, IBM_Plex_Sans } from "next/font/google"
 
 import "./globals.css"
 import { Providers } from "@/providers/providers"
-import { SidebarProvider } from "@/components/ui/sidebar"
+import { SidebarProvider, SidebarInset, SidebarTrigger } from "@/components/ui/sidebar"
 import { AppSidebar } from "@/components/layout/app-sidebar"
 import { ToastProvider } from "@/components/ui/toast-provider"
 import { TooltipProvider } from "@/components/ui/tooltip"
+import { Separator } from "@/components/ui/separator"
 import { cn } from "@/lib/utils";
+import { Breadcrumbs } from "@/components/layout/breadcrumbs"
 
-const merriweatherHeading = Merriweather({subsets:['latin'],variable:'--font-heading'});
-
-const ibmPlexSans = IBM_Plex_Sans({subsets:['latin'],variable:'--font-sans'})
+const ibmPlexSans = IBM_Plex_Sans({ subsets: ['latin'], variable: '--font-sans', weight: ['300', '400', '500', '600', '700'] })
 
 const fontMono = Geist_Mono({
   subsets: ["latin"],
@@ -26,7 +26,7 @@ export default function RootLayout({
     <html
       lang="en"
       suppressHydrationWarning
-      className={cn("dark antialiased", fontMono.variable, "font-sans", ibmPlexSans.variable, merriweatherHeading.variable)}
+      className={cn("dark antialiased", fontMono.variable, "font-sans", ibmPlexSans.variable)}
     >
       <body>
         <Providers>
@@ -34,9 +34,18 @@ export default function RootLayout({
             <ToastProvider>
               <SidebarProvider>
                 <AppSidebar />
-                <main className="flex-1 overflow-auto bg-background">
-                  <div className="h-full px-6 py-6">{children}</div>
-                </main>
+                <SidebarInset>
+                  {/* Minimal header strip */}
+                  <header className="flex h-10 shrink-0 items-center gap-2 border-b border-border/40 px-4">
+                    <SidebarTrigger className="-ml-1 h-7 w-7" />
+                    <Separator orientation="vertical" className="mr-1 h-4" />
+                    <Breadcrumbs />
+                  </header>
+                  {/* Content area */}
+                  <div className="flex-1 overflow-auto px-6 py-5">
+                    {children}
+                  </div>
+                </SidebarInset>
               </SidebarProvider>
             </ToastProvider>
           </TooltipProvider>
