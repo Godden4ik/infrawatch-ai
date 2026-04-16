@@ -6,6 +6,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { evaluateRag } from "@/services/rag/actions";
 import { ragKeys } from "@/services/rag/query-options";
 import { unwrap } from "@/services/_shared/safe-action";
+import { ProviderSelector, type ProviderSelection } from "@/components/provider-selector";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { FlaskConical, Loader2, Sparkles } from "lucide-react";
@@ -25,11 +26,21 @@ interface EvalFormProps {
 export function EvalForm({ onQueryChange }: EvalFormProps) {
   const [query, setQuery] = useState("");
   const [serviceContext, setServiceContext] = useState("");
+  const [judgeSelection, setJudgeSelection] = useState<ProviderSelection>({
+    provider: "anthropic",
+    model: "claude-haiku-4-5-20251001",
+  });
   const queryClient = useQueryClient();
 
   const mutation = useMutation({
     mutationFn: async () => {
-      const result = await evaluateRag(query, serviceContext || undefined);
+      const result = await evaluateRag(
+        query,
+        serviceContext || undefined,
+        judgeSelection.provider,
+        judgeSelection.model || undefined,
+        judgeSelection.apiKey ?? undefined,
+      );
       return unwrap(result);
     },
     onSuccess: (data) => {
@@ -77,6 +88,13 @@ export function EvalForm({ onQueryChange }: EvalFormProps) {
           </button>
         ))}
       </div>
+
+      {/* Judge LLM selector */}
+      <ProviderSelector
+        value={judgeSelection}
+        onChange={setJudgeSelection}
+        label="Judge LLM"
+      />
 
       {/* Service context + submit */}
       <div className="flex gap-3">
