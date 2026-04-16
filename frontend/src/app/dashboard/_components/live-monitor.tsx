@@ -59,7 +59,7 @@ export function LiveMonitor() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.3, delay: 0.3 + groupIdx * 0.06 }}
           >
-            <h3 className="font-mono text-xs tracking-[0.16em] text-muted-foreground uppercase sticky top-0 z-10 bg-background/80 backdrop-blur-sm py-1">
+            <h3 className="font-mono text-xs tracking-[0.16em] text-muted-foreground uppercase sticky -top-5 z-10 bg-background/95 backdrop-blur-sm py-2 -mx-6 px-6 border-b border-border/40">
               {group.label}
             </h3>
             <div className="grid gap-3 grid-cols-1 md:grid-cols-2 xl:grid-cols-3">

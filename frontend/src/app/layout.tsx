@@ -51,7 +51,7 @@ export default function RootLayout({
                   </div>
                   <CoreRouteTabs />
                 </header>
-                <div className="min-h-0 flex-1 overflow-y-auto overscroll-auto px-6 py-3">
+                <div className="min-h-0 flex-1 overflow-y-auto overscroll-auto px-6 py-5">
                   {children}
                 </div>
               </div>
