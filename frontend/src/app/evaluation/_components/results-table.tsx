@@ -13,6 +13,73 @@ interface ResultsTableProps {
   data: RagResult;
 }
 
+const GRAPH_CONTEXT_KEYS = [
+  "applies_to_services",
+  "referenced_services",
+  "downstream_dependencies",
+  "affected_services",
+  "root_cause_services",
+  "resolved_by_runbooks",
+  "symptoms",
+  "root_cause_dependencies",
+];
+
+function getItemTitle(item: Record<string, unknown>, index: number) {
+  return (
+    (item.runbook_title as string | undefined) ??
+    (item.title as string | undefined) ??
+    `Result ${index + 1}`
+  );
+}
+
+function getItemId(item: Record<string, unknown>) {
+  return (
+    (item.runbook_id as string | undefined) ??
+    (item.incident_id as string | undefined) ??
+    (item.id as string | undefined)
+  );
+}
+
+function getBodyLines(item: Record<string, unknown>) {
+  const lines: string[] = [];
+  const stepTitle = item.step_title as string | undefined;
+  const content = item.content as string | undefined;
+  const description = item.description as string | undefined;
+  const rootCause = item.root_cause as string | undefined;
+  const resolution = item.resolution as string | undefined;
+  const steps = Array.isArray(item.steps)
+    ? item.steps.filter((step): step is string => typeof step === "string")
+    : [];
+
+  if (stepTitle) lines.push(`Step: ${stepTitle}`);
+  if (content) lines.push(content);
+  if (description) lines.push(description);
+  if (rootCause) lines.push(`Root cause: ${rootCause}`);
+  if (resolution) lines.push(`Resolution: ${resolution}`);
+  if (steps.length > 0) {
+    lines.push(...steps.map((step, stepIndex) => `${stepIndex + 1}. ${step}`));
+  }
+
+  return lines;
+}
+
+function getGraphContext(item: Record<string, unknown>) {
+  const nested = item.graph_context;
+  if (nested && typeof nested === "object" && !Array.isArray(nested)) {
+    return Object.entries(nested as Record<string, unknown>).filter(([, value]) => {
+      if (Array.isArray(value)) return value.length > 0;
+      return value !== null && value !== undefined && value !== "";
+    });
+  }
+
+  return GRAPH_CONTEXT_KEYS.flatMap((key) => {
+    const value = item[key];
+    if (Array.isArray(value) && value.length === 0) return [];
+    if (value === null || value === undefined || value === "") return [];
+    return [[key, value] as const];
+  });
+}
+
 function ResultItem({
   item,
   index,
@@ -22,10 +89,11 @@ function ResultItem({
   index: number;
   hasGraphContext?: boolean;
 }) {
-  const title = (item.title as string) ?? `Result ${index + 1}`;
+  const title = getItemTitle(item, index);
+  const itemId = getItemId(item);
   const severity = item.severity as string | undefined;
-  const steps = item.steps as string[] | undefined;
-  const graphContext = item.graph_context as Record<string, unknown> | undefined;
+  const bodyLines = getBodyLines(item);
+  const graphContext = getGraphContext(item);
 
   return (
     <motion.div
@@ -35,52 +103,55 @@ function ResultItem({
       className="space-y-2 border border-border/60 bg-background/40 p-3"
     >
       <div className="flex items-start justify-between gap-3">
-        <h4 className="text-sm font-medium leading-snug">{title}</h4>
-        {severity && (
-          <Badge
-            variant="outline"
-            className={cn(
-              "shrink-0 font-mono text-[10px] uppercase tracking-[0.16em]",
-              severity === "critical" &&
-                "border-destructive/30 bg-destructive/10 text-destructive",
-              severity === "high" &&
-                "border-[color:var(--color-warning)]/30 bg-[color:var(--color-warning)]/10 text-[color:var(--color-warning)]",
-              severity === "medium" &&
-                "border-primary/30 bg-primary/10 text-primary",
-              severity === "low" &&
-                "border-[color:var(--color-success)]/30 bg-[color:var(--color-success)]/10 text-[color:var(--color-success)]",
-            )}
-          >
-            {severity}
-          </Badge>
-        )}
+        <div className="space-y-1">
+          <h4 className="text-sm font-medium leading-snug">{title}</h4>
+          {itemId ? (
+            <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-muted-foreground">
+              {itemId}
+            </p>
+          ) : null}
+        </div>
+        <div className="flex shrink-0 flex-col items-end gap-2">
+          {severity && (
+            <Badge
+              variant="outline"
+              className={cn(
+                "shrink-0 font-mono text-[10px] uppercase tracking-[0.16em]",
+                severity === "critical" &&
+                  "border-destructive/30 bg-destructive/10 text-destructive",
+                severity === "high" &&
+                  "border-[color:var(--color-warning)]/30 bg-[color:var(--color-warning)]/10 text-[color:var(--color-warning)]",
+                severity === "medium" &&
+                  "border-primary/30 bg-primary/10 text-primary",
+                severity === "low" &&
+                  "border-[color:var(--color-success)]/30 bg-[color:var(--color-success)]/10 text-[color:var(--color-success)]",
+              )}
+            >
+              {severity}
+            </Badge>
+          )}
+        </div>
       </div>
 
-      {steps && steps.length > 0 && (
-        <ol className="space-y-1 pl-4 text-xs text-muted-foreground">
-          {steps.map((step, i) => (
-            <li key={i} className="list-decimal leading-relaxed">
-              {step}
-            </li>
+      {bodyLines.length > 0 ? (
+        <div className="space-y-1.5 text-xs text-muted-foreground">
+          {bodyLines.map((line, i) => (
+            <p key={`${index}-${i}`} className="leading-relaxed">
+              {line}
+            </p>
           ))}
-        </ol>
-      )}
+        </div>
+      ) : null}
 
-      {typeof item.resolution === "string" && (
-        <p className="text-xs text-muted-foreground">
-          Resolution: {item.resolution}
-        </p>
-      )}
-
-      {graphContext && hasGraphContext && (
+      {graphContext.length > 0 && hasGraphContext && (
         <div className="flex flex-wrap gap-2 border-t border-border/40 pt-3">
-          {Object.entries(graphContext).map(([key, val]) => (
+          {graphContext.map(([key, val]) => (
             <span
               key={key}
               className="inline-flex items-center gap-1 border border-primary/20 bg-primary/10 px-2 py-1 font-mono text-[11px] text-primary"
             >
               <Network className="h-3 w-3" />
-              {key}: {JSON.stringify(val)}
+              {key}: {Array.isArray(val) ? val.join(", ") : JSON.stringify(val)}
             </span>
           ))}
         </div>

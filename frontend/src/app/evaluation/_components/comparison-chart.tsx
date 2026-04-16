@@ -101,13 +101,22 @@ function MetricCard({
 }
 
 export function ComparisonChart({ data }: ComparisonChartProps) {
+  const graphMetrics = data.graphrag.metrics;
+  const naiveMetrics = data.naive.metrics;
   const graphTotal =
+    graphMetrics?.result_count ??
     data.graphrag.runbook_results.length + data.graphrag.incident_results.length;
   const naiveTotal =
+    naiveMetrics?.result_count ??
     data.naive.runbook_results.length + data.naive.incident_results.length;
-  const contextKeyCount = data.graphrag.service_context
-    ? Object.keys(data.graphrag.service_context).length
-    : 0;
+  const graphContextCount =
+    graphMetrics?.context_richness ??
+    (data.graphrag.service_context ? Object.keys(data.graphrag.service_context).length : 0);
+  const graphJudgeRelevance = graphMetrics?.llm_content_relevance ?? 0;
+  const naiveJudgeRelevance = naiveMetrics?.llm_content_relevance ?? 0;
+  const graphJudgeActionability = graphMetrics?.llm_actionability ?? 0;
+  const naiveJudgeActionability = naiveMetrics?.llm_actionability ?? 0;
+  const overlap = data.content_overlap ?? 0;
 
   return (
     <Card className="h-full p-0">
@@ -123,19 +132,19 @@ export function ComparisonChart({ data }: ComparisonChartProps) {
             variant="outline"
             className={cn(
               "font-mono text-[10px] uppercase tracking-[0.16em]",
-              graphTotal >= naiveTotal
+              graphJudgeRelevance >= naiveJudgeRelevance
                 ? "border-primary/30 bg-primary/10 text-primary"
                 : "border-border text-muted-foreground",
             )}
           >
             <GitCompareArrows className="mr-1 h-3 w-3" />
-            {graphTotal >= naiveTotal ? "graph lead" : "parity"}
+            {graphJudgeRelevance >= naiveJudgeRelevance ? "judge scored" : "parity"}
           </Badge>
         </div>
       </CardContent>
 
       <CardContent className="space-y-3 p-4">
-        <div className="grid gap-3 md:grid-cols-2 2xl:grid-cols-4">
+        <div className="grid gap-3 md:grid-cols-2 2xl:grid-cols-6">
           <MetricCard
             label="Runbooks"
             graphrag={data.graphrag.runbook_results.length}
@@ -162,11 +171,27 @@ export function ComparisonChart({ data }: ComparisonChartProps) {
           />
           <MetricCard
             label="Graph Context"
-            graphrag={contextKeyCount}
+            graphrag={graphContextCount}
             naive={0}
             icon={Network}
             delay={0.24}
             hint="attached context keys"
+          />
+          <MetricCard
+            label="Judge Relevance"
+            graphrag={graphJudgeRelevance}
+            naive={naiveJudgeRelevance}
+            icon={GitCompareArrows}
+            delay={0.32}
+            hint="LLM content score"
+          />
+          <MetricCard
+            label="Judge Action"
+            graphrag={graphJudgeActionability}
+            naive={naiveJudgeActionability}
+            icon={AlertTriangle}
+            delay={0.4}
+            hint={`LLM actionability • overlap ${overlap.toFixed(2)}`}
           />
         </div>
       </CardContent>

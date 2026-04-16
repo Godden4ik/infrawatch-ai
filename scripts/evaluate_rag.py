@@ -12,15 +12,14 @@ Usage:
 import argparse
 import asyncio
 import json
-import os
-import re
+import sys
 
 from dotenv import load_dotenv
 
-load_dotenv()
-
-from agents.providers import get_llm
+from graph.evaluation import build_mode_metrics, content_overlap, judge_result_sets
 from graph.retrieval import graphrag_retrieve, naive_rag_retrieve
+
+load_dotenv()
 
 # ── Evaluation queries ───────────────────────────────────────────────
 
@@ -80,180 +79,35 @@ EVAL_QUERIES = [
 
 # ── Scoring ──────────────────────────────────────────────────────────
 
-# All service names in the topology — used for text-based service extraction in Naive RAG
-KNOWN_SERVICES = {"api-gateway", "payment-service", "user-service", "order-service", "redis-cache"}
-
-
-def _format_results(results: dict) -> str:
-    """Format retrieval results into a readable string."""
-    parts = []
-    for rb in results.get("runbook_results", [])[:3]:
-        parts.append(f"Runbook: {rb.get('runbook_title', 'N/A')} ({rb.get('runbook_id', '?')})")
-        parts.append(f"  Step: {rb.get('step_title', 'N/A')}")
-        content = rb.get("content", "")
-        parts.append(f"  Content: {content[:200]}...")
-        if "applies_to_services" in rb:
-            parts.append(f"  Services: {rb['applies_to_services']}")
-        if "referenced_services" in rb:
-            parts.append(f"  References: {rb['referenced_services']}")
-    for inc in results.get("incident_results", [])[:3]:
-        parts.append(f"Incident: {inc.get('title', 'N/A')} ({inc.get('incident_id', '?')})")
-        parts.append(f"  Root cause: {inc.get('root_cause', 'N/A')[:150]}")
-        if "affected_services" in inc:
-            parts.append(f"  Affected: {inc['affected_services']}")
-        if "symptoms" in inc:
-            parts.append(f"  Symptoms: {inc['symptoms']}")
-    if "service_context" in results and results["service_context"]:
-        ctx = results["service_context"]
-        parts.append(f"Service context: {ctx.get('service', '?')}")
-        parts.append(f"  Runbooks: {ctx.get('runbooks', [])}")
-        parts.append(f"  Past incidents: {ctx.get('incidents_affected', [])}")
-    return "\n".join(parts)
-
-
 def score_results(query_info: dict, graphrag_results: dict, naive_results: dict) -> dict:
     """Score results without LLM — deterministic metrics."""
-    expected = set(query_info["expected_services"])
-
-    # Extract services from structured graph fields only.
-    # GraphRAG populates these via graph traversal (APPLIES_TO, REFERENCES, AFFECTED edges).
-    # Naive RAG returns none of these fields by design — its 0 score on cascade queries
-    # demonstrates the key limitation: without graph traversal, topology is invisible.
-    def extract_services(results):
-        services = set()
-        for rb in results.get("runbook_results", []):
-            services.update(rb.get("applies_to_services", []))
-            services.update(rb.get("referenced_services", []))
-        for inc in results.get("incident_results", []):
-            services.update(inc.get("affected_services", []))
-            services.update(inc.get("root_cause_services", []))
-        return services
-
-    graphrag_services = extract_services(graphrag_results)
-    naive_services = extract_services(naive_results)
-
-    # Service accuracy: fraction of expected services found
-    graphrag_svc_acc = len(expected & graphrag_services) / len(expected) if expected else 1.0
-    naive_svc_acc = len(expected & naive_services) / len(expected) if expected else 1.0
-
-    # Context richness: count of distinct context fields populated
-    def context_richness(results):
-        fields = 0
-        for rb in results.get("runbook_results", []):
-            if rb.get("applies_to_services"):
-                fields += 1
-            if rb.get("referenced_services"):
-                fields += 1
-            if rb.get("downstream_dependencies"):
-                fields += 1
-        for inc in results.get("incident_results", []):
-            if inc.get("affected_services"):
-                fields += 1
-            if inc.get("root_cause_services"):
-                fields += 1
-            if inc.get("symptoms"):
-                fields += 1
-            if inc.get("resolved_by_runbooks"):
-                fields += 1
-        if results.get("service_context"):
-            fields += 3
-        return fields
-
-    graphrag_richness = context_richness(graphrag_results)
-    naive_richness = context_richness(naive_results)
-
-    # Result count
-    graphrag_count = len(graphrag_results.get("runbook_results", [])) + len(graphrag_results.get("incident_results", []))
-    naive_count = len(naive_results.get("runbook_results", [])) + len(naive_results.get("incident_results", []))
-
-    # Content overlap: Jaccard similarity of retrieved runbook IDs.
-    # Shows whether both methods retrieved the same documents — isolating topology enrichment
-    # as GraphRAG's differentiator rather than better retrieval.
-    gr_rb_ids = {rb.get("runbook_id") for rb in graphrag_results.get("runbook_results", []) if rb.get("runbook_id")}
-    nr_rb_ids = {rb.get("runbook_id") for rb in naive_results.get("runbook_results", []) if rb.get("runbook_id")}
-    gr_inc_ids = {inc.get("incident_id") for inc in graphrag_results.get("incident_results", []) if inc.get("incident_id")}
-    nr_inc_ids = {inc.get("incident_id") for inc in naive_results.get("incident_results", []) if inc.get("incident_id")}
-    all_gr_ids = gr_rb_ids | gr_inc_ids
-    all_nr_ids = nr_rb_ids | nr_inc_ids
-    union = all_gr_ids | all_nr_ids
-    intersection = all_gr_ids & all_nr_ids
-    content_overlap = len(intersection) / len(union) if union else 1.0
+    expected_services = query_info["expected_services"]
+    graphrag_metrics = build_mode_metrics(
+        graphrag_results,
+        expected_services=expected_services,
+    )
+    naive_metrics = build_mode_metrics(
+        naive_results,
+        expected_services=expected_services,
+    )
+    service_accuracy_delta = (
+        graphrag_metrics["service_accuracy"] - naive_metrics["service_accuracy"]
+    )
+    context_richness_delta = (
+        graphrag_metrics["context_richness"] - naive_metrics["context_richness"]
+    )
 
     return {
         "query": query_info["query"],
         "category": query_info["category"],
-        "content_overlap": round(content_overlap, 2),
-        "graphrag": {
-            "service_accuracy": graphrag_svc_acc,
-            "context_richness": graphrag_richness,
-            "result_count": graphrag_count,
-            "services_found": sorted(graphrag_services),
-        },
-        "naive": {
-            "service_accuracy": naive_svc_acc,
-            "context_richness": naive_richness,
-            "result_count": naive_count,
-            "services_found": sorted(naive_services),
-        },
+        "content_overlap": round(content_overlap(graphrag_results, naive_results), 2),
+        "graphrag": graphrag_metrics,
+        "naive": naive_metrics,
         "graphrag_advantage": {
-            "service_accuracy_delta": graphrag_svc_acc - naive_svc_acc,
-            "context_richness_delta": graphrag_richness - naive_richness,
+            "service_accuracy_delta": service_accuracy_delta,
+            "context_richness_delta": context_richness_delta,
         },
     }
-
-
-# ── LLM-as-judge ─────────────────────────────────────────────────────
-
-def _build_judge_prompt(query: str, content: str) -> str:
-    return (
-        "You are evaluating retrieved content for an infrastructure incident response system.\n\n"
-        f"Incident query: {query}\n\n"
-        f"Retrieved content:\n{content[:2000]}\n\n"
-        "Score this retrieved content on two dimensions (integers 1–10):\n"
-        "- content_relevance: How well does the content address the specific incident described? "
-        "(10 = directly relevant runbooks/incidents, 1 = unrelated)\n"
-        "- actionability: How actionable are the retrieved steps for an on-call engineer resolving "
-        "this right now? (10 = clear step-by-step remediation, 1 = no useful actions)\n\n"
-        'Respond with only valid JSON, no explanation: {"content_relevance": <int>, "actionability": <int>}'
-    )
-
-
-def _parse_judge_response(text: str) -> dict:
-    match = re.search(r"\{[^}]+\}", text)
-    if match:
-        parsed = json.loads(match.group())
-        return {
-            "content_relevance": int(parsed.get("content_relevance", 5)),
-            "actionability": int(parsed.get("actionability", 5)),
-        }
-    return {"content_relevance": 5, "actionability": 5}
-
-
-async def _llm_judge(
-    query: str,
-    content: str,
-    provider: str = "anthropic",
-    model: str | None = None,
-    api_key: str | None = None,
-) -> dict:
-    """Score retrieved content on content relevance and actionability using an LLM judge.
-
-    Uses get_llm() from the provider registry — supports any registered provider.
-    Returns dict with keys: content_relevance (1-10), actionability (1-10).
-    Falls back to neutral scores on any error.
-    """
-    print(f"[llm_judge] provider={provider} query={query[:50]!r}")
-    prompt = _build_judge_prompt(query, content)
-
-    try:
-        llm = get_llm(provider=provider, model=model, api_key=api_key, temperature=0.0)
-        response = await llm.ainvoke(prompt)
-        text = response.content if isinstance(response.content, str) else str(response.content)
-        print(f"[llm_judge] raw response: {text!r}")
-        return _parse_judge_response(text)
-    except Exception as e:
-        print(f"[llm_judge] ERROR: {type(e).__name__}: {e}")
-    return {"content_relevance": 5, "actionability": 5}
 
 
 # ── Main ─────────────────────────────────────────────────────────────
@@ -277,17 +131,17 @@ async def evaluate_single(
     naive_results = await naive_rag_retrieve(query_info["query"], top_k=5)
 
     scores = score_results(query_info, graphrag_results, naive_results)
-    gr_fmt = _format_results(graphrag_results)
-    nr_fmt = _format_results(naive_results)
+    gr_judge, nr_judge, gr_fmt, nr_fmt = await judge_result_sets(
+        query_info["query"],
+        graphrag_results,
+        naive_results,
+        provider=judge_provider,
+        model=judge_model,
+        api_key=judge_api_key,
+    )
     scores["graphrag_formatted"] = gr_fmt
     scores["naive_formatted"] = nr_fmt
 
-    # Run both judge calls concurrently
-    print(f"[evaluate_single] calling llm_judge ({judge_provider}) for: {query_info['query'][:50]}")
-    gr_judge, nr_judge = await asyncio.gather(
-        _llm_judge(query_info["query"], gr_fmt, provider=judge_provider, model=judge_model, api_key=judge_api_key),
-        _llm_judge(query_info["query"], nr_fmt, provider=judge_provider, model=judge_model, api_key=judge_api_key),
-    )
     print(f"[evaluate_single] judge results: gr={gr_judge} nr={nr_judge}")
     scores["graphrag"]["llm_content_relevance"] = gr_judge["content_relevance"]
     scores["graphrag"]["llm_actionability"] = gr_judge["actionability"]
@@ -379,7 +233,13 @@ def main():
 
     model_info = f", model: {args.model}" if args.model else ""
     print(f"Running evaluation... (judge: {args.provider}{model_info})")
-    results = asyncio.run(evaluate_all(queries, judge_provider=args.provider, judge_model=args.model))
+    results = asyncio.run(
+        evaluate_all(
+            queries,
+            judge_provider=args.provider,
+            judge_model=args.model,
+        )
+    )
 
     if args.json:
         # Remove formatted text for cleaner JSON

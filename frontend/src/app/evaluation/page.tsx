@@ -51,14 +51,16 @@ export default function EvaluationPage() {
   );
 
   const graphResultCount =
+    data?.graphrag.metrics?.result_count ??
     (data?.graphrag.runbook_results.length ?? 0) +
-    (data?.graphrag.incident_results.length ?? 0);
+      (data?.graphrag.incident_results.length ?? 0);
   const naiveResultCount =
+    data?.naive.metrics?.result_count ??
     (data?.naive.runbook_results.length ?? 0) +
-    (data?.naive.incident_results.length ?? 0);
-  const graphContextCount = data?.graphrag.service_context
-    ? Object.keys(data.graphrag.service_context).length
-    : 0;
+      (data?.naive.incident_results.length ?? 0);
+  const graphContextCount =
+    data?.graphrag.metrics?.context_richness ??
+    (data?.graphrag.service_context ? Object.keys(data.graphrag.service_context).length : 0);
   const queryState = data ? "ready" : "idle";
 
   return (
@@ -109,12 +111,16 @@ export default function EvaluationPage() {
         <StatCard
           label="Graph Context"
           value={graphContextCount}
-          sub={data?.graphrag.service_context ? "context keys attached" : "no service context"}
+          sub={
+            data?.graphrag.service_context || data?.graphrag.metrics
+              ? "context fields attached"
+              : "no service context"
+          }
         />
         <StatCard
-          label="Last Query"
-          value={currentQuery ? "live" : "idle"}
-          sub={currentQuery ? currentQuery.slice(0, 28) : "awaiting compare run"}
+          label="Judge"
+          value={data?.judge_provider ?? "idle"}
+          sub={data?.judge_model ?? "awaiting compare run"}
         />
       </div>
 
