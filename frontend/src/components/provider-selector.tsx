@@ -11,6 +11,7 @@ import {
 } from "@/services/providers/query-options";
 import { getProviderDisplay } from "@/lib/provider-display";
 import { getStoredKey, storeKey, clearKey } from "@/lib/provider-keys";
+import { saveKey, removeKey } from "@/services/providers/actions";
 import { toast } from "@/hooks/use-toast";
 import { apiClient } from "@/services/_shared/fetch-client";
 import {
@@ -119,19 +120,26 @@ export function ProviderSelector({
 
   function handleSaveKey() {
     if (!keyInput.trim()) return;
-    storeKey(value.provider, keyInput.trim());
-    setStoredKey(keyInput.trim());
-    onChange({ ...value, apiKey: keyInput.trim() });
+    const trimmed = keyInput.trim();
+    // sessionStorage for immediate UX (cache)
+    storeKey(value.provider, trimmed);
+    setStoredKey(trimmed);
+    onChange({ ...value, apiKey: trimmed });
     setKeyInput("");
-    toast.success("API key saved to session");
-    runHealthCheck(value.provider, keyInput.trim());
+    toast.success("API key saved");
+    // Persist to SQLite via server action (fire-and-forget)
+    saveKey(value.provider, trimmed).catch(console.error);
+    runHealthCheck(value.provider, trimmed);
   }
 
   function handleClearKey() {
+    // Clear sessionStorage cache
     clearKey(value.provider);
     setStoredKey(null);
     onChange({ ...value, apiKey: null });
-    toast.info("Session key cleared");
+    toast.info("API key cleared");
+    // Remove from SQLite via server action (fire-and-forget)
+    removeKey(value.provider).catch(console.error);
   }
 
   const needsKey =

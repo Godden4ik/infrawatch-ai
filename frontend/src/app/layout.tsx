@@ -1,10 +1,11 @@
-import { Geist, Geist_Mono, IBM_Plex_Sans, Merriweather } from "next/font/google"
+import { Geist_Mono, IBM_Plex_Sans, Merriweather } from "next/font/google"
 
 import "./globals.css"
 import { Providers } from "@/providers/providers"
 import { SidebarProvider } from "@/components/ui/sidebar"
 import { AppSidebar } from "@/components/layout/app-sidebar"
 import { ToastProvider } from "@/components/ui/toast-provider"
+import { TooltipProvider } from "@/components/ui/tooltip"
 import { cn } from "@/lib/utils";
 
 const merriweatherHeading = Merriweather({subsets:['latin'],variable:'--font-heading'});
@@ -25,16 +26,18 @@ export default function RootLayout({
     <html
       lang="en"
       suppressHydrationWarning
-      className={cn("antialiased", fontMono.variable, "font-sans", ibmPlexSans.variable, merriweatherHeading.variable)}
+      className={cn("dark antialiased", fontMono.variable, "font-sans", ibmPlexSans.variable, merriweatherHeading.variable)}
     >
       <body>
         <Providers>
-          <ToastProvider>
-            <SidebarProvider>
-              <AppSidebar />
-              <main className="flex-1 overflow-auto px-8 py-7">{children}</main>
-            </SidebarProvider>
-          </ToastProvider>
+          <TooltipProvider>
+            <ToastProvider>
+              <SidebarProvider>
+                <AppSidebar />
+                <main className="flex-1 overflow-auto bg-background px-6 py-4">{children}</main>
+              </SidebarProvider>
+            </ToastProvider>
+          </TooltipProvider>
         </Providers>
       </body>
     </html>
