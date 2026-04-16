@@ -92,6 +92,8 @@ export function ProviderSelector({
 
       if (health.status === "healthy") {
         toast.success(`${providerId} is healthy (${health.latency_ms}ms)`);
+      } else if (health.status === "no_key") {
+        // Expected state — no toast, just update the cached health dot
       } else {
         toast.error(
           `${providerId} health check failed: ${health.error ?? health.status}`,
@@ -112,8 +114,6 @@ export function ProviderSelector({
     const key = getStoredKey(providerId);
     setStoredKey(key);
     onChange({ provider: providerId, model, apiKey: key });
-    // Fire health check on provider switch
-    runHealthCheck(providerId, key);
   }
 
   function handleModelChange(model: string | null) {
