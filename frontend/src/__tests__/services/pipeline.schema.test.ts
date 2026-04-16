@@ -1,5 +1,9 @@
 import { describe, it, expect } from "vitest";
-import { streamEventSchema, AGENT_ORDER } from "@/services/pipeline/schema";
+import {
+  AGENT_ORDER,
+  normalizeAgentName,
+  streamEventSchema,
+} from "@/services/pipeline/schema";
 
 describe("streamEventSchema", () => {
   it("parses a token event", () => {
@@ -46,6 +50,14 @@ describe("streamEventSchema", () => {
     expect(event.type).toBe("done");
   });
 
+  it("parses an error event", () => {
+    const event = streamEventSchema.parse({
+      type: "error",
+      message: "pipeline failed",
+    });
+    expect(event.type).toBe("error");
+  });
+
   it("rejects an unknown event type", () => {
     expect(() =>
       streamEventSchema.parse({ type: "unknown_event" }),
@@ -70,5 +82,17 @@ describe("AGENT_ORDER", () => {
     expect(AGENT_ORDER[0]).toBe("monitor_node");
     expect(AGENT_ORDER[1]).toBe("analyst_node");
     expect(AGENT_ORDER[2]).toBe("responder_node");
+  });
+});
+
+describe("normalizeAgentName", () => {
+  it("maps backend node names to frontend keys", () => {
+    expect(normalizeAgentName("monitor")).toBe("monitor_node");
+    expect(normalizeAgentName("analyst")).toBe("analyst_node");
+    expect(normalizeAgentName("responder")).toBe("responder_node");
+  });
+
+  it("keeps canonical keys unchanged", () => {
+    expect(normalizeAgentName("monitor_node")).toBe("monitor_node");
   });
 });

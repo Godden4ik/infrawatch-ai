@@ -1,6 +1,6 @@
 import { queryOptions } from "@tanstack/react-query";
 import { apiClient } from "@/services/_shared/fetch-client";
-import type { PrometheusResult } from "./schema";
+import { mapPrometheusResultToMetricPoints } from "./schema";
 
 export const metricsKeys = {
   all: ["metrics"] as const,
@@ -13,9 +13,9 @@ export function metricsQueryOptions(promql: string) {
   return queryOptions({
     queryKey: metricsKeys.query(promql),
     queryFn: () =>
-      apiClient<PrometheusResult>("/api/metrics/api/v1/query", {
+      apiClient<unknown>("/api/metrics/api/v1/query", {
         params: { query: promql },
-      }),
+      }).then(mapPrometheusResultToMetricPoints),
     refetchInterval: 15_000,
   });
 }
@@ -29,8 +29,8 @@ export function metricsRangeQueryOptions(
   return queryOptions({
     queryKey: metricsKeys.range(promql, start, end, step),
     queryFn: () =>
-      apiClient<PrometheusResult>("/api/metrics/api/v1/query_range", {
+      apiClient<unknown>("/api/metrics/api/v1/query_range", {
         params: { query: promql, start, end, step },
-      }),
+      }).then(mapPrometheusResultToMetricPoints),
   });
 }

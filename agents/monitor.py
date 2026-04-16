@@ -6,7 +6,7 @@ import re
 
 from langchain_core.tools import BaseTool
 
-from agents.config import get_llm
+from agents.providers import get_llm
 
 logger = logging.getLogger(__name__)
 from agents.llm_utils import run_agent_with_tools
@@ -20,10 +20,10 @@ _REQUIRED_ANOMALY_FIELDS = {"service", "metric", "value", "threshold", "severity
 def _parse_anomalies(text: str) -> list[dict]:
     """Extract JSON anomaly list from the LLM response.
 
-    Tries in order:
+    Only accepts fenced code blocks to prevent bare arrays in prose from being
+    misidentified as anomaly lists.  Tries in order:
     1. ```json ... ``` fenced block
-    2. ``` ... ``` fenced block (no language tag)
-    3. First [...] JSON array found anywhere in the text
+    2. ``` ... ``` fenced block (no language tag, content starts with '[')
 
     Each entry must have service, metric, value, threshold, and severity fields.
     """
@@ -36,10 +36,6 @@ def _parse_anomalies(text: str) -> list[dict]:
 
     # 2. ``` ... ``` (no language tag, content starts with '[')
     for m in re.finditer(r"```\s*(\[[\s\S]*?)```", text):
-        candidates.append(m.group(1).strip())
-
-    # 3. Any bare [...] array in the text
-    for m in re.finditer(r"(\[[\s\S]*?\])", text):
         candidates.append(m.group(1).strip())
 
     for candidate in candidates:
@@ -58,10 +54,10 @@ def _parse_anomalies(text: str) -> list[dict]:
     return []
 
 
-async def monitor_node(state: PipelineState, tools: list[BaseTool], llm_provider: str = "anthropic", llm_model: str | None = None) -> dict:
+async def monitor_node(state: PipelineState, tools: list[BaseTool], llm_provider: str = "anthropic", llm_model: str | None = None, api_key: str | None = None) -> dict:
     """Check all services for anomalies using Prometheus and Grafana tools."""
     logger.info("=== MONITOR AGENT (iteration %d) ===", state.get("iteration", 0))
-    llm = get_llm(provider=llm_provider, model=llm_model)
+    llm = get_llm(provider=llm_provider, model=llm_model, api_key=api_key)
     messages, content = await run_agent_with_tools(
         llm=llm,
         tools=tools,

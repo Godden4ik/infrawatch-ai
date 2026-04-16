@@ -84,22 +84,6 @@ services:
     networks:
       - infrawatch
 
-  streamlit-ui:
-    build: ui
-    ports:
-      - "8501:8501"
-    networks:
-      - infrawatch
-    depends_on:
-      - prometheus
-      - grafana
-      - neo4j
-    environment:
-      - PROMETHEUS_URL=http://prometheus:9090
-      - NEO4J_URI=bolt://neo4j:7687
-      - NEO4J_USER=neo4j
-      - NEO4J_PASSWORD=infrawatch
-
   # --- API Backend & Frontend ---
   api-backend:
     build:

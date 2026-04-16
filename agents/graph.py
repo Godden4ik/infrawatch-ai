@@ -40,14 +40,15 @@ def build_graph(
     responder_tools: list[BaseTool],
     llm_provider: str = "anthropic",
     llm_model: str | None = None,
+    api_key: str | None = None,
 ):
     """Build and compile the agent pipeline StateGraph."""
     graph = StateGraph(PipelineState)
 
-    # Add nodes with tool lists, LLM provider and model injected via partial
-    graph.add_node("monitor", partial(monitor_node, tools=monitor_tools, llm_provider=llm_provider, llm_model=llm_model))
-    graph.add_node("analyst", partial(analyst_node, tools=analyst_tools, llm_provider=llm_provider, llm_model=llm_model))
-    graph.add_node("responder", partial(responder_node, tools=responder_tools, llm_provider=llm_provider, llm_model=llm_model))
+    # Add nodes with tool lists, LLM provider, model, and api_key injected via partial
+    graph.add_node("monitor", partial(monitor_node, tools=monitor_tools, llm_provider=llm_provider, llm_model=llm_model, api_key=api_key))
+    graph.add_node("analyst", partial(analyst_node, tools=analyst_tools, llm_provider=llm_provider, llm_model=llm_model, api_key=api_key))
+    graph.add_node("responder", partial(responder_node, tools=responder_tools, llm_provider=llm_provider, llm_model=llm_model, api_key=api_key))
 
     # Edges
     graph.set_entry_point("monitor")

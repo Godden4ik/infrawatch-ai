@@ -1,11 +1,10 @@
-"""Configuration — LLM factory, MCP server paths, environment loading."""
+"""Configuration — logging setup, MCP server paths, environment loading."""
 
 import logging
 import os
 from pathlib import Path
 
 from dotenv import load_dotenv
-from langchain_anthropic import ChatAnthropic
 
 load_dotenv()
 
@@ -46,27 +45,3 @@ MCP_SERVERS = {
         "env": _subprocess_env,
     },
 }
-
-ANTHROPIC_DEFAULT_MODEL = "claude-haiku-4-5-20251001"
-OLLAMA_DEFAULT_MODEL = "llama3.1"
-
-
-def get_llm(temperature: float = 0.0, provider: str = "anthropic", model: str | None = None):
-    """Return an LLM instance for agent use.
-
-    provider: "anthropic" (default) or "ollama"
-    model:    override the default model for the chosen provider
-    """
-    if provider == "ollama":
-        from langchain_ollama import ChatOllama
-        base_url = os.getenv("OLLAMA_URL", "http://localhost:11434")
-        return ChatOllama(
-            model=model or OLLAMA_DEFAULT_MODEL,
-            base_url=base_url,
-            temperature=temperature,
-        )
-    return ChatAnthropic(
-        model=model or ANTHROPIC_DEFAULT_MODEL,
-        temperature=temperature,
-        api_key=os.getenv("ANTHROPIC_API_KEY"),
-    )

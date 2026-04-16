@@ -3,7 +3,11 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiClientStream } from "@/services/_shared/fetch-client";
 import { pipelineKeys } from "./query-options";
-import type { PipelineState, StreamEvent } from "./schema";
+import {
+  normalizeAgentName,
+  type PipelineState,
+  type StreamEvent,
+} from "./schema";
 
 const INITIAL_STATE: PipelineState = {
   status: "idle",
@@ -15,10 +19,18 @@ function mergeEvent(
   event: StreamEvent,
 ): PipelineState {
   if (event.type === "done") {
-    return { ...state, status: "complete" };
+    return state.status === "error" ? state : { ...state, status: "complete" };
   }
 
-  const agent = "agent" in event ? event.agent : "";
+  if (event.type === "error") {
+    return {
+      ...state,
+      status: "error",
+      error: event.message,
+    };
+  }
+
+  const agent = "agent" in event ? normalizeAgentName(event.agent) : "";
   const prev = state.agents[agent] ?? { tokens: "", toolCalls: [] };
 
   switch (event.type) {
@@ -34,6 +46,7 @@ function mergeEvent(
     case "tool_start":
       return {
         ...state,
+        status: "running",
         agents: {
           ...state.agents,
           [agent]: {
@@ -45,6 +58,7 @@ function mergeEvent(
     case "tool_end":
       return {
         ...state,
+        status: "running",
         agents: {
           ...state.agents,
           [agent]: {
@@ -60,6 +74,7 @@ function mergeEvent(
     case "agent_complete":
       return {
         ...state,
+        status: "running",
         agents: {
           ...state.agents,
           [agent]: { ...prev, result: event.result },
@@ -77,6 +92,7 @@ export function usePipelineStream() {
     mutationFn: async (params: {
       llmProvider?: string;
       llmModel?: string;
+      apiKey?: string;
     }) => {
       queryClient.setQueryData(pipelineKeys.currentRun(), INITIAL_STATE);
 
@@ -86,6 +102,7 @@ export function usePipelineStream() {
         body: JSON.stringify({
           llm_provider: params.llmProvider ?? "anthropic",
           llm_model: params.llmModel ?? null,
+          api_key: params.apiKey ?? null,
         }),
       });
 

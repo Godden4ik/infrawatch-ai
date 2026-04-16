@@ -17,6 +17,8 @@ export function createProxy(baseUrl: string, prefix?: string) {
       "Content-Type",
       req.headers.get("Content-Type") || "application/json",
     );
+    const providerKey = req.headers.get("X-Provider-Key");
+    if (providerKey) headers.set("X-Provider-Key", providerKey);
 
     const init: RequestInit = {
       method: req.method,

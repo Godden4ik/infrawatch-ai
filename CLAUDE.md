@@ -14,8 +14,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **Monitoring**: Prometheus, Grafana
 - **Graph Database**: Neo4j (topology store + GraphRAG)
 - **Infrastructure**: Docker, Docker Compose
-- **Frontend**: Streamlit
-- **Testing**: pytest, pytest-asyncio, httpx
+- **Frontend**: Next.js 16, React 19, TanStack Query, shadcn/ui (base-lyra preset), Tailwind CSS v4, Zod, motion/react
+- **Frontend Icons**: @lobehub/icons (provider brand logos), lucide-react, react-icons
+- **Testing**: pytest, pytest-asyncio, httpx (backend); vitest, @testing-library/react (frontend)
 
 ## Commands
 
@@ -24,7 +25,10 @@ docker compose up          # Deploy full stack (Prometheus, Grafana, Neo4j, serv
 python graph/seed.py       # Seed Neo4j topology (run once after compose up)
 python graph/ingest.py     # Ingest runbooks + incidents into Neo4j (local embeddings)
 
-streamlit run ui/app.py    # Launch Streamlit dashboard on http://localhost:8501
+cd frontend && pnpm dev    # Launch Next.js frontend on http://localhost:3001
+cd frontend && pnpm build  # Production build
+cd frontend && pnpm typecheck  # TypeScript type check
+cd frontend && pnpm lint   # ESLint
 
 pytest tests/unit/         # Unit tests — no services needed
 pytest tests/integration/  # Integration tests — requires docker compose up
@@ -38,7 +42,7 @@ python scripts/inject_anomaly.py latency payment-service  # Inject on specific s
 python scripts/evaluate_rag.py                        # GraphRAG vs Naive RAG comparison (Anthropic judge)
 python scripts/evaluate_rag.py --json                 # Structured output
 python scripts/evaluate_rag.py --query 3              # Single query
-python scripts/evaluate_rag.py --provider ollama --ollama-model qwen2.5:14b  # Ollama judge
+python scripts/evaluate_rag.py --provider ollama --model qwen2.5:14b  # Ollama judge
 
 python -c "import asyncio; from agents import run_pipeline; print(asyncio.run(run_pipeline()))"  # Run agent pipeline (Anthropic)
 python -c "import asyncio; from agents import run_pipeline; print(asyncio.run(run_pipeline(llm_provider='ollama', llm_model='qwen2.5:14b')))"  # Ollama backend
@@ -63,13 +67,15 @@ gh pr create
 ### Repository Layout
 
 ```
-services/      # Simulated microservices emitting Prometheus metrics  ✅ DONE
-mcp-servers/   # Three MCP servers: Grafana, Prometheus, Neo4j        ✅ DONE
-agents/        # LangGraph pipeline: Monitor → Analyst → Responder    ✅ DONE
-graph/         # Neo4j schemas, seed data, GraphRAG pipeline          ✅ DONE
-ui/            # Streamlit dashboard (5 pages)                        ✅ DONE
-tests/         # unit/ ✅  integration/ ✅  e2e/ ✅
-scripts/       # inject_anomaly.py, evaluate_rag.py                   ✅ DONE
+frontend/      # Next.js 16 app (React 19, shadcn/ui, TanStack Query)
+api_backend/   # FastAPI control plane (routes, Pydantic models)
+agents/        # LangGraph pipeline: Monitor → Analyst → Responder + provider registry
+services/      # Simulated microservices emitting Prometheus metrics
+mcp-servers/   # Three MCP servers: Grafana, Prometheus, Neo4j
+graph/         # Neo4j schemas, seed data, GraphRAG pipeline
+ui/            # Legacy Streamlit dashboard (kept for reference, not deployed)
+tests/         # unit/ integration/ e2e/
+scripts/       # inject_anomaly.py, evaluate_rag.py
 ```
 
 ### Agent Pipeline
@@ -92,10 +98,13 @@ Monitor Agent → Analyst Agent → Responder Agent
 - Streaming: `stream_pipeline()` yields `astream_events(version="v2")` events; the UI renders live token output and tool call progress per agent node
 - Anomaly parsing: `_parse_anomalies()` only accepts a `\`\`\`json` fenced block that parses to a list with all required fields (`service`, `metric`, `value`, `threshold`, `severity`) — rejects hallucinated or malformed output
 
-**LLM backend selection:**
-- `llm_provider="anthropic"` (default) — `ChatAnthropic` via Anthropic API
-- `llm_provider="ollama"` + `llm_model="<name>"` — `ChatOllama` via local Ollama instance on `localhost:11434`
-- Provider and model are threaded through `run_pipeline` / `stream_pipeline` → `build_graph` → each node via `functools.partial`
+**LLM Provider Registry** (`agents/providers.py`):
+- Pluggable provider system — new provider = one dict entry in `PROVIDER_REGISTRY` + `pip install langchain-<provider>`
+- Registered: `anthropic`, `openai`, `gemini`, `ollama`
+- `get_llm(provider, model, temperature, api_key)` uses `importlib.import_module` for lazy loading
+- Each entry specifies `key_kwarg` for provider-specific constructor kwargs (e.g., `google_api_key` for Gemini)
+- Runtime API keys accepted per-request — never stored, never logged
+- Provider + model + api_key threaded through `run_pipeline` / `stream_pipeline` → `build_graph` → each node via `functools.partial`
 - Ollama requires ≥14B model for reliable structured tool calling; 7B models hallucinate tool results in multi-step pipelines
 
 ### MCP Servers
@@ -108,28 +117,64 @@ Each MCP server exposes domain-specific tools to agents:
 | Grafana MCP (`mcp-servers/grafana_mcp/server.py`) | `list_dashboards`, `get_dashboard`, `get_panel`, `list_alerts` |
 | Neo4j MCP (`mcp-servers/neo4j_mcp/server.py`) | `run_cypher`, `get_service_dependencies`, `get_blast_radius`, `search_runbooks`, `find_similar_incidents`, `get_runbook_for_service`, `search_knowledge_base` |
 
-### Streamlit UI
+### Next.js Frontend (`frontend/`)
 
-Five pages under `ui/pages/`, shared components in `ui/components/`:
+**Stack**: Next.js 16, React 19, TanStack Query, shadcn/ui (base-lyra preset `b4XK2a41RI`), Tailwind CSS v4, Zod, motion/react, @lobehub/icons, nuqs
 
-| Page | File | Key behaviour |
-|------|------|---------------|
-| Home | `app.py` | Connectivity checks for all services |
-| Service Health | `1_Dashboard.py` | Live Prometheus metrics, auto-refresh |
-| Anomaly Injection | `2_Anomaly_Injection.py` | Preset + manual injection, pipeline trigger |
-| Pipeline Results | `3_Pipeline_Results.py` | Live token + tool-call streaming per agent; LLM provider selector (Anthropic/Ollama) in sidebar; runbooks/incidents fetched from Neo4j by ID |
-| Dependency Graph | `4_Dependency_Graph.py` | pyvis interactive graph, blast-radius highlighting |
-| GraphRAG Eval | `5_GraphRAG_Eval.py` | Side-by-side comparison + Plotly bar charts; LLM-as-judge provider selector (Anthropic/Ollama + model name input) |
+**Pages:**
+
+| Route | Purpose |
+|-------|---------|
+| `/` | System overview — connectivity checks |
+| `/dashboard` | Service health — live Prometheus metrics |
+| `/anomaly` | Anomaly injection — presets + manual |
+| `/pipeline` | Agent pipeline — SSE streaming, ProviderSelector |
+| `/topology` | Dependency graph — XYFlow interactive |
+| `/evaluation` | GraphRAG eval — side-by-side comparison, judge ProviderSelector |
+
+**Skill Usage — MANDATORY:**
+
+| Working on | Load skill FIRST |
+|------------|-----------------|
+| Any new page or UI surface | Read `frontend/docs/patterns/page-layout.md` first. Pick pattern B/C/D. State it. |
+| Any `components/ui/` or UI change | `shadcn` skill — check registry + audit |
+| After completing UI work | Run `/arch-review` agent to verify compliance |
+
+**Do NOT use `frontend-design`** for pages. Follow `frontend/docs/patterns/page-layout.md` instead.
+
+**Frontend Architecture Rules (adapted from Salon Svitlo CRM):**
+
+1. **Services Layer** (`src/services/{domain}/`): Each resource has `schema.ts` (Zod DTOs), `query-options.ts` (TanStack Query key factories), `actions.ts` (server actions with `safeAction`). Client hooks use `unwrap(await action())`.
+
+2. **Client-Server Proxy**: All client→backend goes through Next.js API route handlers (`app/api/[service]/[...path]/route.ts`). Sensitive data (API URLs, keys) stays server-side.
+
+3. **TanStack Query is sole caching layer**: Never use Next.js `cache`, `revalidateTag`, or ISR. `apiServer` uses `cache: "no-store"`.
+
+4. **State management**: Server state → TanStack Query. URL state → nuqs. Client UI state → React state (no Zustand yet). No duplication.
+
+5. **Components**: `ui/` = shadcn primitives. Domain composites in page `_components/` folders or `src/components/`.
+
+6. **Styling**: Tailwind v4 CSS-based config. Use semantic tokens (`text-foreground`, `bg-card`, `border-border`) — never raw colors. `cn()` utility for className merging.
+
+7. **Provider icons**: `@lobehub/icons` for brand logos (Anthropic, OpenAI, Gemini.Color, Ollama). Fallback to `lucide-react` BrainCircuit for unknown providers. Display map at `src/lib/provider-display.ts`.
+
+8. **Runtime API keys**: Stored in `sessionStorage` per provider. Sent per-request in body. Never persisted. `src/lib/provider-keys.ts`.
+
+9. **Charts**: nivo only (never recharts). `@nivo/line`, `@nivo/bar`, `@nivo/radar`, `@nivo/pie`, `@nivo/heatmap`. Always use `Responsive*` wrappers. Colors from CSS variables.
+
+10. **Density**: This is a monitoring tool. Padding: `p-3` stat cards, `p-4` content cards. Gaps: `gap-3` cards, `gap-4` sections. Font: `text-xs` labels, `text-sm` body, `text-base` headings. See `frontend/docs/patterns/page-layout.md`.
+
+11. **Page patterns**: Every page fits pattern B (bento), C (hybrid), or D (split-pane). See `frontend/docs/patterns/page-layout.md` for decision flow and anatomy.
 
 ### GraphRAG vs Naive RAG
 
 A key deliverable is demonstrating GraphRAG superiority for topology-dependent queries (e.g., blast radius analysis). Runbooks and incident reports are ingested into Neo4j alongside the infrastructure topology graph. The `sentence-transformers` model generates embeddings; the Anthropic API is **not** used for embeddings.
 
-**LLM-as-judge** (`scripts/evaluate_rag.py` / `5_GraphRAG_Eval.py`):
+**LLM-as-judge** (`scripts/evaluate_rag.py` / `/evaluation` page):
 - Scores retrieved content on `content_relevance` and `actionability` (1–10 integers) per query
-- Supports `provider="anthropic"` (Claude Haiku via async SDK) and `provider="ollama"` (local REST call to `localhost:11434/api/chat` via `asyncio.to_thread`)
+- Uses `get_llm()` from provider registry — any registered provider works as judge
 - Both GraphRAG and Naive RAG retrieve the same documents (high Jaccard content overlap); the judge scores are expected to be similar — the structural metrics (service coverage, context richness) are where GraphRAG wins
-- CLI flags: `--provider anthropic|ollama`, `--ollama-model <name>`
+- CLI flags: `--provider <any_registered_id>`, `--model <name>`
 
 ## Phase Status
 
@@ -188,4 +233,5 @@ MCP servers use stdio transport — agents invoke them as subprocesses.
 | Grafana | 3000 (admin / infrawatch) |
 | Neo4j HTTP | 7474 (neo4j / infrawatch) |
 | Neo4j Bolt | 7687 |
-| Streamlit UI | 8501 |
+| FastAPI Backend | 8090 |
+| Next.js Frontend | 3001 |

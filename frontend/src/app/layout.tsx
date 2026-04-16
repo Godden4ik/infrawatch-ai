@@ -1,15 +1,14 @@
-import { Geist, Geist_Mono } from "next/font/google"
+import { Geist_Mono, IBM_Plex_Sans } from "next/font/google"
 
 import "./globals.css"
 import { Providers } from "@/providers/providers"
-import { SidebarProvider } from "@/components/ui/sidebar"
-import { AppSidebar } from "@/components/layout/app-sidebar"
+import { ToastProvider } from "@/components/ui/toast-provider"
+import { TooltipProvider } from "@/components/ui/tooltip"
 import { cn } from "@/lib/utils";
+import { Breadcrumbs } from "@/components/layout/breadcrumbs"
+import { CoreRouteTabs } from "@/components/layout/core-route-tabs"
 
-const fontSans = Geist({
-  subsets: ["latin"],
-  variable: "--font-sans",
-})
+const ibmPlexSans = IBM_Plex_Sans({ subsets: ['latin'], variable: '--font-sans', weight: ['300', '400', '500', '600', '700'] })
 
 const fontMono = Geist_Mono({
   subsets: ["latin"],
@@ -25,14 +24,39 @@ export default function RootLayout({
     <html
       lang="en"
       suppressHydrationWarning
-      className={cn("antialiased", fontMono.variable, "font-sans", fontSans.variable)}
+      className={cn(
+        "dark h-full antialiased",
+        fontMono.variable,
+        "font-sans",
+        ibmPlexSans.variable,
+      )}
     >
-      <body>
+      <body className="h-full overflow-hidden bg-background text-foreground">
         <Providers>
-          <SidebarProvider>
-            <AppSidebar />
-            <main className="flex-1 overflow-auto px-8 py-7">{children}</main>
-          </SidebarProvider>
+          <TooltipProvider>
+            <ToastProvider>
+              <div className="flex h-svh flex-col overflow-hidden">
+                <header className="z-20 shrink-0 border-b border-border/60 bg-background/95 backdrop-blur-md">
+                  <div className="flex h-10 items-center justify-between gap-4 px-6">
+                    <Breadcrumbs />
+                    <div className="flex items-center gap-2 font-mono text-[11px] text-muted-foreground">
+                      <span className="relative flex h-2 w-2 shrink-0">
+                        <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
+                        <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500" />
+                      </span>
+                      <span className="uppercase tracking-[0.14em] text-muted-foreground/80">
+                        System Online
+                      </span>
+                    </div>
+                  </div>
+                  <CoreRouteTabs />
+                </header>
+                <div className="min-h-0 flex-1 overflow-y-auto overscroll-auto px-6 py-5">
+                  {children}
+                </div>
+              </div>
+            </ToastProvider>
+          </TooltipProvider>
         </Providers>
       </body>
     </html>

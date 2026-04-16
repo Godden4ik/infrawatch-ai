@@ -12,15 +12,14 @@ Usage:
 import argparse
 import asyncio
 import json
-import os
-import re
+import sys
 
-import anthropic
 from dotenv import load_dotenv
 
-load_dotenv()
-
+from graph.evaluation import build_mode_metrics, content_overlap, judge_result_sets
 from graph.retrieval import graphrag_retrieve, naive_rag_retrieve
+
+load_dotenv()
 
 # ── Evaluation queries ───────────────────────────────────────────────
 
@@ -80,213 +79,49 @@ EVAL_QUERIES = [
 
 # ── Scoring ──────────────────────────────────────────────────────────
 
-# All service names in the topology — used for text-based service extraction in Naive RAG
-KNOWN_SERVICES = {"api-gateway", "payment-service", "user-service", "order-service", "redis-cache"}
-
-
-def _format_results(results: dict) -> str:
-    """Format retrieval results into a readable string."""
-    parts = []
-    for rb in results.get("runbook_results", [])[:3]:
-        parts.append(f"Runbook: {rb.get('runbook_title', 'N/A')} ({rb.get('runbook_id', '?')})")
-        parts.append(f"  Step: {rb.get('step_title', 'N/A')}")
-        content = rb.get("content", "")
-        parts.append(f"  Content: {content[:200]}...")
-        if "applies_to_services" in rb:
-            parts.append(f"  Services: {rb['applies_to_services']}")
-        if "referenced_services" in rb:
-            parts.append(f"  References: {rb['referenced_services']}")
-    for inc in results.get("incident_results", [])[:3]:
-        parts.append(f"Incident: {inc.get('title', 'N/A')} ({inc.get('incident_id', '?')})")
-        parts.append(f"  Root cause: {inc.get('root_cause', 'N/A')[:150]}")
-        if "affected_services" in inc:
-            parts.append(f"  Affected: {inc['affected_services']}")
-        if "symptoms" in inc:
-            parts.append(f"  Symptoms: {inc['symptoms']}")
-    if "service_context" in results and results["service_context"]:
-        ctx = results["service_context"]
-        parts.append(f"Service context: {ctx.get('service', '?')}")
-        parts.append(f"  Runbooks: {ctx.get('runbooks', [])}")
-        parts.append(f"  Past incidents: {ctx.get('incidents_affected', [])}")
-    return "\n".join(parts)
-
-
 def score_results(query_info: dict, graphrag_results: dict, naive_results: dict) -> dict:
     """Score results without LLM — deterministic metrics."""
-    expected = set(query_info["expected_services"])
-
-    # Extract services from structured graph fields only.
-    # GraphRAG populates these via graph traversal (APPLIES_TO, REFERENCES, AFFECTED edges).
-    # Naive RAG returns none of these fields by design — its 0 score on cascade queries
-    # demonstrates the key limitation: without graph traversal, topology is invisible.
-    def extract_services(results):
-        services = set()
-        for rb in results.get("runbook_results", []):
-            services.update(rb.get("applies_to_services", []))
-            services.update(rb.get("referenced_services", []))
-        for inc in results.get("incident_results", []):
-            services.update(inc.get("affected_services", []))
-            services.update(inc.get("root_cause_services", []))
-        return services
-
-    graphrag_services = extract_services(graphrag_results)
-    naive_services = extract_services(naive_results)
-
-    # Service accuracy: fraction of expected services found
-    graphrag_svc_acc = len(expected & graphrag_services) / len(expected) if expected else 1.0
-    naive_svc_acc = len(expected & naive_services) / len(expected) if expected else 1.0
-
-    # Context richness: count of distinct context fields populated
-    def context_richness(results):
-        fields = 0
-        for rb in results.get("runbook_results", []):
-            if rb.get("applies_to_services"):
-                fields += 1
-            if rb.get("referenced_services"):
-                fields += 1
-            if rb.get("downstream_dependencies"):
-                fields += 1
-        for inc in results.get("incident_results", []):
-            if inc.get("affected_services"):
-                fields += 1
-            if inc.get("root_cause_services"):
-                fields += 1
-            if inc.get("symptoms"):
-                fields += 1
-            if inc.get("resolved_by_runbooks"):
-                fields += 1
-        if results.get("service_context"):
-            fields += 3
-        return fields
-
-    graphrag_richness = context_richness(graphrag_results)
-    naive_richness = context_richness(naive_results)
-
-    # Result count
-    graphrag_count = len(graphrag_results.get("runbook_results", [])) + len(graphrag_results.get("incident_results", []))
-    naive_count = len(naive_results.get("runbook_results", [])) + len(naive_results.get("incident_results", []))
-
-    # Content overlap: Jaccard similarity of retrieved runbook IDs.
-    # Shows whether both methods retrieved the same documents — isolating topology enrichment
-    # as GraphRAG's differentiator rather than better retrieval.
-    gr_rb_ids = {rb.get("runbook_id") for rb in graphrag_results.get("runbook_results", []) if rb.get("runbook_id")}
-    nr_rb_ids = {rb.get("runbook_id") for rb in naive_results.get("runbook_results", []) if rb.get("runbook_id")}
-    gr_inc_ids = {inc.get("incident_id") for inc in graphrag_results.get("incident_results", []) if inc.get("incident_id")}
-    nr_inc_ids = {inc.get("incident_id") for inc in naive_results.get("incident_results", []) if inc.get("incident_id")}
-    all_gr_ids = gr_rb_ids | gr_inc_ids
-    all_nr_ids = nr_rb_ids | nr_inc_ids
-    union = all_gr_ids | all_nr_ids
-    intersection = all_gr_ids & all_nr_ids
-    content_overlap = len(intersection) / len(union) if union else 1.0
+    expected_services = query_info["expected_services"]
+    graphrag_metrics = build_mode_metrics(
+        graphrag_results,
+        expected_services=expected_services,
+    )
+    naive_metrics = build_mode_metrics(
+        naive_results,
+        expected_services=expected_services,
+    )
+    service_accuracy_delta = (
+        graphrag_metrics["service_accuracy"] - naive_metrics["service_accuracy"]
+    )
+    context_richness_delta = (
+        graphrag_metrics["context_richness"] - naive_metrics["context_richness"]
+    )
 
     return {
         "query": query_info["query"],
         "category": query_info["category"],
-        "content_overlap": round(content_overlap, 2),
-        "graphrag": {
-            "service_accuracy": graphrag_svc_acc,
-            "context_richness": graphrag_richness,
-            "result_count": graphrag_count,
-            "services_found": sorted(graphrag_services),
-        },
-        "naive": {
-            "service_accuracy": naive_svc_acc,
-            "context_richness": naive_richness,
-            "result_count": naive_count,
-            "services_found": sorted(naive_services),
-        },
+        "content_overlap": round(content_overlap(graphrag_results, naive_results), 2),
+        "graphrag": graphrag_metrics,
+        "naive": naive_metrics,
         "graphrag_advantage": {
-            "service_accuracy_delta": graphrag_svc_acc - naive_svc_acc,
-            "context_richness_delta": graphrag_richness - naive_richness,
+            "service_accuracy_delta": service_accuracy_delta,
+            "context_richness_delta": context_richness_delta,
         },
     }
-
-
-# ── LLM-as-judge ─────────────────────────────────────────────────────
-
-def _build_judge_prompt(query: str, content: str) -> str:
-    return (
-        "You are evaluating retrieved content for an infrastructure incident response system.\n\n"
-        f"Incident query: {query}\n\n"
-        f"Retrieved content:\n{content[:2000]}\n\n"
-        "Score this retrieved content on two dimensions (integers 1–10):\n"
-        "- content_relevance: How well does the content address the specific incident described? "
-        "(10 = directly relevant runbooks/incidents, 1 = unrelated)\n"
-        "- actionability: How actionable are the retrieved steps for an on-call engineer resolving "
-        "this right now? (10 = clear step-by-step remediation, 1 = no useful actions)\n\n"
-        'Respond with only valid JSON, no explanation: {"content_relevance": <int>, "actionability": <int>}'
-    )
-
-
-def _parse_judge_response(text: str) -> dict:
-    match = re.search(r"\{[^}]+\}", text)
-    if match:
-        parsed = json.loads(match.group())
-        return {
-            "content_relevance": int(parsed.get("content_relevance", 5)),
-            "actionability": int(parsed.get("actionability", 5)),
-        }
-    return {"content_relevance": 5, "actionability": 5}
-
-
-async def _llm_judge(
-    query: str,
-    content: str,
-    provider: str = "anthropic",
-    ollama_model: str = "llama3.1",
-) -> dict:
-    """Score retrieved content on content relevance and actionability using an LLM judge.
-
-    provider: "anthropic" uses Claude Haiku; "ollama" calls a local Ollama instance.
-    Returns dict with keys: content_relevance (1-10), actionability (1-10).
-    Falls back to neutral scores on any error.
-    """
-    print(f"[llm_judge] provider={provider} query={query[:50]!r}")
-    prompt = _build_judge_prompt(query, content)
-
-    try:
-        if provider == "ollama":
-            import urllib.request as _urllib_req
-            payload = json.dumps({
-                "model": ollama_model,
-                "messages": [{"role": "user", "content": prompt}],
-                "stream": False,
-            }).encode()
-            req = _urllib_req.Request(
-                "http://localhost:11434/api/chat",
-                data=payload,
-                headers={"Content-Type": "application/json"},
-            )
-            # Run blocking urllib call off the event loop to avoid blocking it
-            import asyncio as _asyncio
-            def _call():
-                resp = _urllib_req.urlopen(req, timeout=120)
-                return json.loads(resp.read().decode())
-            data = await _asyncio.to_thread(_call)
-            text = data["message"]["content"]
-        else:
-            client = anthropic.AsyncAnthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
-            response = await client.messages.create(
-                model="claude-haiku-4-5-20251001",
-                max_tokens=64,
-                messages=[{"role": "user", "content": prompt}],
-            )
-            text = response.content[0].text
-
-        print(f"[llm_judge] raw response: {text!r}")
-        return _parse_judge_response(text)
-    except Exception as e:
-        print(f"[llm_judge] ERROR: {type(e).__name__}: {e}")
-    return {"content_relevance": 5, "actionability": 5}
 
 
 # ── Main ─────────────────────────────────────────────────────────────
 
 
-async def evaluate_single(query_info: dict, judge_provider: str = "anthropic", ollama_model: str = "llama3.1") -> dict:
+async def evaluate_single(
+    query_info: dict,
+    judge_provider: str = "anthropic",
+    judge_model: str | None = None,
+    judge_api_key: str | None = None,
+) -> dict:
     """Run a single query through both retrieval modes and score.
 
-    judge_provider: "anthropic" or "ollama" — controls which LLM grades the results.
+    judge_provider: provider id from PROVIDER_REGISTRY — controls which LLM grades the results.
     """
     service_ctx = query_info["expected_services"][0] if query_info["expected_services"] else None
 
@@ -296,17 +131,17 @@ async def evaluate_single(query_info: dict, judge_provider: str = "anthropic", o
     naive_results = await naive_rag_retrieve(query_info["query"], top_k=5)
 
     scores = score_results(query_info, graphrag_results, naive_results)
-    gr_fmt = _format_results(graphrag_results)
-    nr_fmt = _format_results(naive_results)
+    gr_judge, nr_judge, gr_fmt, nr_fmt = await judge_result_sets(
+        query_info["query"],
+        graphrag_results,
+        naive_results,
+        provider=judge_provider,
+        model=judge_model,
+        api_key=judge_api_key,
+    )
     scores["graphrag_formatted"] = gr_fmt
     scores["naive_formatted"] = nr_fmt
 
-    # Run both judge calls concurrently
-    print(f"[evaluate_single] calling llm_judge ({judge_provider}) for: {query_info['query'][:50]}")
-    gr_judge, nr_judge = await asyncio.gather(
-        _llm_judge(query_info["query"], gr_fmt, provider=judge_provider, ollama_model=ollama_model),
-        _llm_judge(query_info["query"], nr_fmt, provider=judge_provider, ollama_model=ollama_model),
-    )
     print(f"[evaluate_single] judge results: gr={gr_judge} nr={nr_judge}")
     scores["graphrag"]["llm_content_relevance"] = gr_judge["content_relevance"]
     scores["graphrag"]["llm_actionability"] = gr_judge["actionability"]
@@ -319,14 +154,20 @@ async def evaluate_single(query_info: dict, judge_provider: str = "anthropic", o
 async def evaluate_all(
     queries: list[dict] | None = None,
     judge_provider: str = "anthropic",
-    ollama_model: str = "llama3.1",
+    judge_model: str | None = None,
+    judge_api_key: str | None = None,
 ) -> list[dict]:
     """Run all evaluation queries."""
     queries = queries or EVAL_QUERIES
     results = []
     for i, q in enumerate(queries):
         print(f"  [{i+1}/{len(queries)}] {q['query'][:60]}...")
-        result = await evaluate_single(q, judge_provider=judge_provider, ollama_model=ollama_model)
+        result = await evaluate_single(
+            q,
+            judge_provider=judge_provider,
+            judge_model=judge_model,
+            judge_api_key=judge_api_key,
+        )
         results.append(result)
     return results
 
@@ -371,14 +212,13 @@ def main():
     parser.add_argument("--query", type=int, help="Run a single query (1-indexed)")
     parser.add_argument(
         "--provider",
-        choices=["anthropic", "ollama"],
         default="anthropic",
-        help="LLM judge provider (default: anthropic)",
+        help="LLM judge provider id from the provider registry (default: anthropic)",
     )
     parser.add_argument(
-        "--ollama-model",
-        default="llama3.1",
-        help="Ollama model name when --provider=ollama (default: llama3.1)",
+        "--model",
+        default=None,
+        help="Model name for the judge provider (default: provider's default model)",
     )
     args = parser.parse_args()
 
@@ -391,9 +231,15 @@ def main():
     else:
         queries = EVAL_QUERIES
 
-    print(f"Running evaluation... (judge: {args.provider}" +
-          (f", model: {args.ollama_model}" if args.provider == "ollama" else "") + ")")
-    results = asyncio.run(evaluate_all(queries, judge_provider=args.provider, ollama_model=args.ollama_model))
+    model_info = f", model: {args.model}" if args.model else ""
+    print(f"Running evaluation... (judge: {args.provider}{model_info})")
+    results = asyncio.run(
+        evaluate_all(
+            queries,
+            judge_provider=args.provider,
+            judge_model=args.model,
+        )
+    )
 
     if args.json:
         # Remove formatted text for cleaner JSON
