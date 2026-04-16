@@ -22,11 +22,12 @@ after the vector search:
 
 | | GraphRAG | Naive RAG |
 |---|---|---|
-| Vector search | ✅ Same index | ✅ Same index |
+| Vector search | ✅ Same indexes | ✅ Same indexes |
 | Graph traversal | ✅ Follows `APPLIES_TO`, `REFERENCES`, `AFFECTED` edges | ❌ None |
 | Service relationships | ✅ Returns which services are affected | ❌ Text only |
 | Blast radius | ✅ Surfaces downstream dependencies | ❌ Invisible |
 | Context richness | ✅ Structured metadata per result | ❌ Always zero |
+| Noise chunks | ✅ Labeled with `source_system` + empty `related_services` | ❌ Appear with no context — indistinguishable from real results |
 
 **Three metrics are measured:**
 
@@ -135,12 +136,13 @@ if eval_available:
             judge_label = st.session_state.get("rag_judge_label", "LLM")
             st.caption(f"LLM judge: **{judge_label}**")
             st.info(
-                f"Both methods retrieved the **same documents** ({avg_overlap:.0%} content overlap) "
+                f"Both methods retrieved the **same runbooks and incidents** ({avg_overlap:.0%} content overlap) "
                 f"and scored similarly on content quality (relevance {avg_gr_rel:.1f} vs {avg_nr_rel:.1f}/10, "
                 f"actionability {avg_gr_act:.1f} vs {avg_nr_act:.1f}/10). "
                 f"GraphRAG's advantage is the topology layer: it adds on average "
-                f"**{avg_gr_ctx:.0f} relational context fields** per query and surfaces "
-                f"**all expected affected services** — Naive RAG surfaces none."
+                f"**{avg_gr_ctx:.0f} relational context fields** per query, surfaces "
+                f"**all expected affected services**, and labels noise chunks with source system + empty "
+                f"related_services — Naive RAG surfaces none of this."
             )
 
             # ── Summary metrics ───────────────────────────────────────
@@ -299,3 +301,43 @@ if eval_available:
                     if r.get("naive_formatted"):
                         st.markdown("**Retrieved content:**")
                         st.text(r["naive_formatted"][:1200])
+
+                # ── Noise chunk comparison ─────────────────────────────
+                gr_chunks = r.get("graphrag_chunks", [])
+                nr_chunks = r.get("naive_chunks", [])
+                if gr_chunks or nr_chunks:
+                    st.markdown("---")
+                    st.markdown("**Noise chunks retrieved** — background documents with overlapping vocabulary but no service relationships")
+                    st.caption(
+                        "GraphRAG labels each chunk with its source system and shows empty related_services — "
+                        "a structural signal that the document is unrelated to the topology. "
+                        "Naive RAG surfaces the same chunks with no context, making them indistinguishable from real runbooks."
+                    )
+                    ch_gr, ch_nr = st.columns(2)
+                    with ch_gr:
+                        st.markdown("**GraphRAG chunks** *(with source context)*")
+                        if gr_chunks:
+                            for ck in gr_chunks[:3]:
+                                with st.container(border=True):
+                                    st.markdown(f"**{ck.get('document_title', 'N/A')}**")
+                                    cols = st.columns(3)
+                                    cols[0].caption(f"Source: `{ck.get('source_system', '?')}`")
+                                    cols[1].caption(f"Chunk: {ck.get('chunk_index', '?')}")
+                                    cols[2].caption(f"Score: {ck.get('score', 0):.3f}")
+                                    related = ck.get("related_services", [])
+                                    if related:
+                                        st.caption(f"Related services: {related}")
+                                    else:
+                                        st.caption("Related services: **none** — topologically disconnected")
+                                    st.text(ck.get("content", "")[:200] + "...")
+                        else:
+                            st.caption("No chunks retrieved.")
+                    with ch_nr:
+                        st.markdown("**Naive RAG chunks** *(no context)*")
+                        if nr_chunks:
+                            for ck in nr_chunks[:3]:
+                                with st.container(border=True):
+                                    st.markdown(f"**{ck.get('document_title', 'N/A')}**")
+                                    st.caption(f"Score: {ck.get('score', 0):.3f}")
+                                    st.caption("Source system: unknown | Related services: unknown")
+                                    st.text(ck.get("content", "")[:200] + "...")

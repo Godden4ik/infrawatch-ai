@@ -61,6 +61,26 @@ def load_symptoms() -> list[dict]:
         return yaml.safe_load(f)["symptoms"]
 
 
+def load_noise_documents() -> list[dict]:
+    with open(DATA_DIR / "noise_documents.yaml") as f:
+        return yaml.safe_load(f)["noise_documents"]
+
+
+# ── Chunking ─────────────────────────────────────────────────────────
+
+
+def chunk_text(text: str, chunk_words: int = 400, overlap_words: int = 50) -> list[str]:
+    """Split text into overlapping word-based chunks."""
+    words = text.split()
+    chunks = []
+    step = chunk_words - overlap_words
+    start = 0
+    while start < len(words):
+        chunks.append(" ".join(words[start : start + chunk_words]))
+        start += step
+    return chunks
+
+
 # ── Cypher templates ─────────────────────────────────────────────────
 
 CYPHER_CREATE_SYMPTOM = """
@@ -142,12 +162,32 @@ MATCH (sym:Symptom {name: $symptom_name})
 MERGE (inc)-[:HAD_SYMPTOM]->(sym)
 """
 
+CYPHER_CREATE_NOISE_DOCUMENT = """
+MERGE (nd:NoiseDocument {id: $id})
+SET nd.title = $title,
+    nd.source_system = $source_system,
+    nd.word_count = $word_count
+"""
+
+CYPHER_CREATE_KNOWLEDGE_CHUNK = """
+MATCH (nd:NoiseDocument {id: $nd_id})
+MERGE (kc:KnowledgeChunk {id: $chunk_id})
+SET kc.chunk_index = $chunk_index,
+    kc.content = $content,
+    kc.word_count = $word_count,
+    kc.embedding = $embedding
+MERGE (nd)-[:HAS_CHUNK]->(kc)
+"""
+
 VECTOR_INDEXES = [
     """CREATE VECTOR INDEX runbook_step_embedding IF NOT EXISTS
        FOR (rs:RunbookStep) ON (rs.embedding)
        OPTIONS {indexConfig: {`vector.dimensions`: 384, `vector.similarity_function`: 'cosine'}}""",
     """CREATE VECTOR INDEX incident_embedding IF NOT EXISTS
        FOR (i:Incident) ON (i.embedding)
+       OPTIONS {indexConfig: {`vector.dimensions`: 384, `vector.similarity_function`: 'cosine'}}""",
+    """CREATE VECTOR INDEX knowledge_chunk_embedding IF NOT EXISTS
+       FOR (kc:KnowledgeChunk) ON (kc.embedding)
        OPTIONS {indexConfig: {`vector.dimensions`: 384, `vector.similarity_function`: 'cosine'}}""",
 ]
 
@@ -157,6 +197,8 @@ TEXT_INDEXES = [
     "CREATE INDEX IF NOT EXISTS FOR (inc:Incident) ON (inc.id)",
     "CREATE INDEX IF NOT EXISTS FOR (sym:Symptom) ON (sym.id)",
     "CREATE INDEX IF NOT EXISTS FOR (sym:Symptom) ON (sym.name)",
+    "CREATE INDEX IF NOT EXISTS FOR (nd:NoiseDocument) ON (nd.id)",
+    "CREATE INDEX IF NOT EXISTS FOR (kc:KnowledgeChunk) ON (kc.id)",
 ]
 
 
@@ -228,6 +270,27 @@ def ingest_incidents(tx, incidents: list[dict], embed_fn=embed_text) -> int:
     return count
 
 
+def ingest_noise_documents(tx, noise_docs: list[dict], embed_fn=embed_text) -> int:
+    """Create NoiseDocument and KnowledgeChunk nodes with embeddings."""
+    count = 0
+    for doc in noise_docs:
+        words = doc["body"].split()
+        tx.run(CYPHER_CREATE_NOISE_DOCUMENT,
+               id=doc["id"], title=doc["title"],
+               source_system=doc["source_system"],
+               word_count=len(words))
+        for i, chunk in enumerate(chunk_text(doc["body"])):
+            chunk_id = f"{doc['id']}-C{i}"
+            embedding = embed_fn(chunk)
+            tx.run(CYPHER_CREATE_KNOWLEDGE_CHUNK,
+                   nd_id=doc["id"], chunk_id=chunk_id,
+                   chunk_index=i, content=chunk,
+                   word_count=len(chunk.split()),
+                   embedding=embedding)
+        count += 1
+    return count
+
+
 def create_indexes(session) -> None:
     """Create text and vector indexes (must run outside write transactions)."""
     for idx in TEXT_INDEXES:
@@ -241,7 +304,8 @@ def main():
     symptoms = load_symptoms()
     runbooks = load_runbooks()
     incidents = load_incidents()
-    print(f"  {len(symptoms)} symptoms, {len(runbooks)} runbooks, {len(incidents)} incidents")
+    noise_docs = load_noise_documents()
+    print(f"  {len(symptoms)} symptoms, {len(runbooks)} runbooks, {len(incidents)} incidents, {len(noise_docs)} noise documents")
 
     driver = GraphDatabase.driver(URI, auth=(USER, PASSWORD))
 
@@ -266,14 +330,20 @@ def main():
         inc_count = session.execute_write(ingest_incidents, incidents)
     print(f"  → {inc_count} incidents ingested")
 
+    print("Ingesting noise documents with chunking...")
+    with driver.session() as session:
+        noise_count = session.execute_write(ingest_noise_documents, noise_docs)
+    total_chunks = sum(len(chunk_text(d["body"])) for d in noise_docs)
+    print(f"  → {noise_count} noise documents, {total_chunks} chunks ingested")
+
     # Verify
     with driver.session() as session:
-        for label in ["Symptom", "Runbook", "RunbookStep", "Incident"]:
+        for label in ["Symptom", "Runbook", "RunbookStep", "Incident", "NoiseDocument", "KnowledgeChunk"]:
             count = session.run(f"MATCH (n:{label}) RETURN count(n) AS c").single()["c"]
             print(f"  {label}: {count} nodes")
         rel_count = session.run(
             "MATCH ()-[r]->() WHERE type(r) IN "
-            "['APPLIES_TO','HAS_STEP','REFERENCES','AFFECTED','ROOT_CAUSE_IN','RESOLVED_BY','HAD_SYMPTOM','MANIFESTS_IN'] "
+            "['APPLIES_TO','HAS_STEP','REFERENCES','AFFECTED','ROOT_CAUSE_IN','RESOLVED_BY','HAD_SYMPTOM','MANIFESTS_IN','HAS_CHUNK'] "
             "RETURN count(r) AS c"
         ).single()["c"]
         print(f"  Knowledge relationships: {rel_count}")

@@ -108,6 +108,12 @@ def _format_results(results: dict) -> str:
         parts.append(f"Service context: {ctx.get('service', '?')}")
         parts.append(f"  Runbooks: {ctx.get('runbooks', [])}")
         parts.append(f"  Past incidents: {ctx.get('incidents_affected', [])}")
+    for ck in results.get("chunk_results", [])[:2]:
+        parts.append(f"Background doc: {ck.get('document_title', 'N/A')}")
+        content = ck.get("content", "")
+        parts.append(f"  Content: {content[:150]}...")
+        if "source_system" in ck:
+            parts.append(f"  Source: {ck['source_system']}")
     return "\n".join(parts)
 
 
@@ -300,6 +306,8 @@ async def evaluate_single(query_info: dict, judge_provider: str = "anthropic", o
     nr_fmt = _format_results(naive_results)
     scores["graphrag_formatted"] = gr_fmt
     scores["naive_formatted"] = nr_fmt
+    scores["graphrag_chunks"] = graphrag_results.get("chunk_results", [])
+    scores["naive_chunks"] = naive_results.get("chunk_results", [])
 
     # Run both judge calls concurrently
     print(f"[evaluate_single] calling llm_judge ({judge_provider}) for: {query_info['query'][:50]}")

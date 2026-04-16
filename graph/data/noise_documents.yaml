@@ -1,0 +1,290 @@
+noise_documents:
+  - id: ND-001
+    title: "Kubernetes Pod Eviction and Memory Pressure Management"
+    source_system: kubernetes
+    body: |
+      Kubernetes manages workload resources through a combination of requests, limits, and Quality of Service
+      classes. When a node experiences memory pressure, the kubelet begins an eviction process to reclaim
+      resources and prevent system-level out-of-memory conditions. Understanding eviction thresholds, pod
+      priority, and the OOM killer behavior is essential for maintaining cluster stability under load.
+
+      When memory.available drops below the eviction threshold (default 100Mi for soft eviction, 50Mi for
+      hard eviction), the kubelet begins terminating pods to reclaim memory. The eviction order follows
+      Quality of Service classes: BestEffort pods are evicted first because they have no memory requests
+      or limits defined. Burstable pods are next — they have requests defined but their usage exceeds
+      the request value. Guaranteed pods, where requests equal limits, are evicted last. This prioritization
+      prevents critical workloads from being killed during a memory pressure event.
+
+      The Linux OOM killer is a last resort. When the kernel cannot satisfy a memory allocation request and
+      all other mechanisms have failed, the OOM killer selects a process to terminate based on its OOM score.
+      Kubernetes sets oom_score_adj on containers to influence this selection: Guaranteed containers get -997,
+      Burstable containers get values between 2 and 999, and BestEffort containers get 1000. A high OOM score
+      means the kernel will prefer to kill that process first. In practice, when the OOM killer fires inside
+      a container, Kubernetes detects the exit code 137 and marks the container as OOMKilled.
+
+      Memory limits define the hard ceiling for container memory usage. When a container exceeds its limit,
+      the kernel invokes the OOM killer within the container's cgroup. This is distinct from node-level memory
+      pressure: even if the node has available memory, a container that exceeds its own memory limit will be
+      killed. Setting memory limits too low causes spurious OOMKilled restarts; setting them too high allows
+      a runaway container to cause node-level memory pressure and cascade evictions of other pods.
+
+      The kubelet evaluates eviction conditions at a configurable interval (default 10 seconds). Soft eviction
+      thresholds allow a grace period before eviction begins, preventing transient memory spikes from causing
+      unnecessary pod termination. Hard eviction thresholds trigger immediate eviction without grace periods.
+      During a memory pressure event, the kubelet also sets the node condition MemoryPressure=True, which
+      prevents new pods from being scheduled onto the node.
+
+      Monitoring memory pressure requires tracking multiple metrics. The node_memory_MemAvailable_bytes metric
+      from node-exporter shows available memory. The container_memory_working_set_bytes metric, used by the
+      kubelet for eviction decisions, includes all anonymous memory and file-backed pages that cannot be
+      reclaimed. The container_memory_rss metric shows only anonymous memory. When working set bytes
+      approach the memory limit, eviction risk increases substantially.
+
+      Cache memory (PageCache) occupies a large portion of available memory but is reclaimable. The kubelet's
+      eviction logic accounts for this by measuring memory.available as total capacity minus working set usage
+      minus kernel overhead. A sudden drop in cache hit ratio combined with rising memory pressure often
+      indicates a memory-intensive workload has been scheduled, displacing cached file system pages and
+      increasing disk I/O latency as the kernel must re-read pages from disk.
+
+      Connection pool saturation in the kubelet's API server communication can mask memory pressure events.
+      If the kubelet cannot report node status due to API server connection issues, memory pressure conditions
+      may go unreported. This creates a window where node memory is critically low but the scheduler continues
+      to place new pods, accelerating the cascade. To prevent this, kubelet liveness probes and API server
+      connection pool limits should be tuned together.
+
+      Recovery from a memory pressure event involves identifying the source of memory growth. Use kubectl
+      top nodes to identify affected nodes, and kubectl top pods --sort-by=memory to find the largest
+      consumers. If a specific pod is consuming excessive memory, check for memory leaks in the application,
+      misconfigured memory limits, or missing TTL-based cache eviction. After removing or limiting the
+      offending workload, the kubelet will remove the MemoryPressure condition once memory.available rises
+      above the eviction threshold and the threshold hold period (default 5 minutes) has elapsed.
+
+      Vertical Pod Autoscaler can automate right-sizing of memory requests and limits based on historical
+      usage patterns. However, VPA recommendations require pod restarts to apply, making it unsuitable for
+      stateful or latency-sensitive workloads without disruption. For those workloads, manual limit tuning
+      with headroom buffers (typically 20-30% above observed peak usage) is recommended to avoid OOMKilled
+      events during traffic spikes.
+
+  - id: ND-002
+    title: "PostgreSQL Connection Pool Exhaustion and Query Latency Optimization"
+    source_system: postgresql
+    body: |
+      PostgreSQL's connection model allocates a dedicated backend process for each client connection. Unlike
+      connection-multiplexing databases, each PostgreSQL connection consumes approximately 5-10MB of memory
+      and holds locks on internal data structures. When connection count approaches max_connections (default
+      100), new connection attempts are rejected with the error "sorry, too many clients already". This
+      hard ceiling makes connection pooling mandatory for high-concurrency applications.
+
+      PgBouncer is the most widely deployed connection pooler for PostgreSQL. It operates in three modes:
+      session pooling (one server connection per client session), transaction pooling (server connection
+      held only during a transaction), and statement pooling (most aggressive, but incompatible with
+      prepared statements). Transaction pooling mode is the standard choice for web applications, allowing
+      hundreds of application threads to share a much smaller pool of actual PostgreSQL connections.
+
+      Connection pool exhaustion manifests as latency spikes: when the pool is saturated, new queries wait
+      in queue rather than executing. If the queue depth limit is reached, PgBouncer rejects connections
+      with "no more connections allowed". This cascades to the application layer as timeout errors: the
+      application's own connection timeout fires after waiting too long for a pool slot. The result is an
+      error rate spike that superficially resembles a database failure but is actually a throughput ceiling.
+
+      Diagnosing connection pool exhaustion requires monitoring pg_stat_activity for connection count
+      trends, and monitoring PgBouncer's own stats via SHOW POOLS and SHOW STATS. Key metrics include
+      cl_active (clients currently executing queries), cl_waiting (clients waiting for a server connection),
+      and sv_idle (available server connections in pool). A high cl_waiting value relative to pool_size
+      indicates saturation. The average wait time metric quantifies the latency impact.
+
+      Slow queries compound connection pool pressure. A query that normally executes in 5ms but degrades
+      to 500ms under load holds a connection 100x longer, reducing effective pool throughput by the same
+      factor. Use pg_stat_statements to identify queries with high total_time or high mean_time. The
+      EXPLAIN ANALYZE command shows the query execution plan including actual vs estimated row counts.
+      Plan regressions (where the query planner chooses a full table scan instead of an index scan due to
+      stale statistics) are a common cause of sudden query latency increases.
+
+      VACUUM and AUTOVACUUM are PostgreSQL's mechanisms for reclaiming space from dead tuples and updating
+      table statistics. Tables with high update and delete rates accumulate table bloat: dead tuples that
+      occupy space but are invisible to current transactions. Excessive bloat causes sequential scans to
+      read more pages than necessary, increasing I/O and query latency. VACUUM ANALYZE reclaims dead tuple
+      space and refreshes the statistics used by the query planner. On heavily updated tables, autovacuum
+      may not run frequently enough; manual tuning of autovacuum_vacuum_scale_factor and
+      autovacuum_analyze_scale_factor is often required.
+
+      Index bloat is distinct from table bloat. B-tree indexes in PostgreSQL are not self-balancing under
+      high write load; deleted entries leave gaps that are not immediately reused. A bloated index occupies
+      more pages than necessary, increasing the number of I/O operations per index scan. The pg_bloat_check
+      extension or queries against pgstattuple can quantify index bloat. When index bloat exceeds 30%,
+      a REINDEX CONCURRENTLY operation can rebuild the index without locking the table.
+
+      Circuit breaker patterns applied at the application layer prevent connection pool exhaustion from
+      cascading. When the error rate for database queries exceeds a threshold (typically 5-10% over a
+      30-second window), the circuit breaker opens and fast-fails new database calls with an application-level
+      error rather than queueing them. This prevents the connection pool from filling with waiting requests
+      and gives the database time to recover. The circuit breaker transitions to half-open state after a
+      configurable timeout, allowing a test query through to check database availability.
+
+      Memory usage in PostgreSQL is split between shared_buffers (page cache shared across all connections),
+      work_mem (per-query sort and hash operation buffer), and maintenance_work_mem (used by VACUUM and
+      index builds). The shared_buffers hit ratio, visible in pg_statio_user_tables as
+      heap_blks_hit / (heap_blks_hit + heap_blks_read), should exceed 0.99 for read-heavy workloads.
+      A sudden drop in hit ratio indicates either a cache eviction caused by a large sequential scan or
+      insufficient shared_buffers allocation for the working dataset size.
+
+      Monitoring the cascade of symptoms: connection pool exhaustion causes latency spikes, which cause
+      timeout errors in the application, which trigger retries, which further exhaust the connection pool.
+      Breaking this retry storm requires implementing exponential backoff with jitter at the application
+      layer, setting a maximum retry count, and ensuring the circuit breaker fires before the pool is
+      completely saturated. Without these protections, a transient 10-second database slowdown can escalate
+      into a sustained outage lasting 10-20 minutes as retry traffic prevents recovery.
+
+  - id: ND-003
+    title: "Nginx Upstream Error Handling, Circuit Breakers, and Load Balancer Tuning"
+    source_system: nginx
+    body: |
+      Nginx functions as both an HTTP reverse proxy and a TCP/UDP load balancer. In reverse proxy mode,
+      it maintains a pool of upstream server connections and distributes incoming requests across them.
+      Proper configuration of upstream health checks, timeout values, error handling, and connection pool
+      limits is critical for maintaining low error rates and predictable latency under variable load.
+
+      The upstream block defines the pool of backend servers. By default, Nginx uses round-robin load
+      balancing. The least_conn directive switches to least-connections balancing, which is preferable
+      when upstream response times vary significantly. The hash directive with consistent hashing is
+      used for session affinity. Each server directive within the upstream block can specify weight,
+      max_fails, fail_timeout, and backup parameters.
+
+      Passive health checks are the default mechanism. When a request to an upstream server fails
+      (connection refused, timeout, or 5xx response), Nginx marks a failure against that server. After
+      max_fails failures (default 1) within the fail_timeout window (default 10s), Nginx marks the server
+      as unavailable and stops routing requests to it for the fail_timeout duration. This is effectively
+      a simple circuit breaker: the server is removed from rotation after repeated failures. After the
+      timeout expires, Nginx marks the server as available again and sends test requests. If those succeed,
+      the server returns to full rotation; if they fail, the unavailability timer resets.
+
+      Active health checks (available in Nginx Plus) periodically probe upstream servers regardless of
+      live traffic. A health check URI, expected response code, and check interval are configured. Active
+      checks detect failures before user traffic is affected, reducing the error rate spike associated
+      with passive check-based failure detection. The latency between a server going down and passive
+      detection is equal to the time until the next real request fails — which can be zero at high traffic
+      rates or significant during off-peak periods.
+
+      Timeout configuration significantly affects error rate and latency. The proxy_connect_timeout
+      directive controls how long Nginx waits to establish a TCP connection to an upstream server
+      (default 60s — far too high for most applications; 2-5s is typical). The proxy_read_timeout
+      controls how long Nginx waits for the upstream to send a response chunk (default 60s). Setting
+      these too high masks upstream failures as latency; setting them too low causes false positives.
+      The proxy_send_timeout controls how long Nginx waits to transmit a request to the upstream.
+
+      Keepalive connection pooling reduces connection establishment overhead. The keepalive directive
+      in the upstream block sets the maximum number of idle keepalive connections to each upstream server
+      that are preserved in the cache. When a new request arrives, Nginx reuses an idle keepalive connection
+      rather than performing a TCP handshake. This reduces both latency and connection pool pressure on
+      the upstream server. The tradeoff is that idle keepalive connections hold file descriptors and
+      memory; the keepalive value should be set proportional to the expected request rate, not the maximum
+      connection capacity.
+
+      Rate limiting with limit_req_zone and limit_req prevents upstream servers from being overwhelmed
+      during traffic spikes. Requests that exceed the configured rate are either delayed (burst parameter)
+      or immediately rejected with a 429 response (nodelay parameter). Rate limiting acts as a load-shedding
+      mechanism: it trades increased error rate for reduced latency on requests that are admitted. Without
+      rate limiting, a traffic spike can cause all upstream servers to become overloaded simultaneously,
+      pushing all requests above the latency threshold rather than cleanly rejecting a fraction.
+
+      Upstream memory pressure surfaces in Nginx through worker process memory growth. Each Nginx worker
+      maintains its own upstream connection pool, SSL session cache, and request buffer pool. When workers
+      process large response bodies with proxy_buffering enabled, memory usage scales with concurrent
+      requests times average response size. The worker_rlimit_nofile and worker_connections limits cap
+      the maximum concurrent connections per worker process. Exceeding worker_connections causes Nginx
+      to reject new connections with "worker_connections are not enough" in the error log.
+
+      Error handling with error_page directives allows custom responses for specific upstream failure
+      codes. A cascade failure scenario: payment upstream returns 503, Nginx returns a custom 503 to
+      the client, the client retries, Nginx routes to the same unavailable upstream cluster. Without
+      a circuit breaker delay, retries amplify load on already-stressed upstream servers. The proxy_next_upstream
+      directive controls which error conditions trigger failover to the next server in the pool: by default,
+      error and timeout conditions trigger failover; http_500 and http_502 can also be added to enable
+      error-based failover. Setting proxy_next_upstream_tries limits the number of failover attempts,
+      preventing a slow cascade through all upstream servers.
+
+      Monitoring Nginx health requires tracking stub_status metrics (active connections, requests per
+      second, accepts vs handled connections for dropped connection detection) and upstream-level metrics
+      via log parsing or the upstream_addr and upstream_status variables. The ratio of 5xx responses
+      to total responses gives the upstream error rate. A rising error rate combined with increasing
+      response time in the $upstream_response_time log variable indicates upstream degradation, not
+      Nginx-internal problems. The distinction matters for root cause analysis.
+
+  - id: ND-004
+    title: "SRE Error Budgets, Blast Radius Estimation, and Cascade Failure Modes"
+    source_system: sre-theory
+    body: |
+      Site Reliability Engineering formalizes the relationship between reliability targets and engineering
+      velocity through the error budget framework. An SLO (Service Level Objective) defines the acceptable
+      reliability threshold: a 99.9% availability SLO means no more than 43.8 minutes of downtime per
+      month. The complement — 0.1% — is the error budget. As long as the error budget is not exhausted,
+      the team can take risks (deployments, experiments, configuration changes) knowing that failures
+      within the budget are expected and acceptable.
+
+      Error budget depletion accelerates during cascade failures. A single dependency failure can exhaust
+      weeks of error budget in hours. The blast radius of a failure is defined as the set of services,
+      user journeys, and SLOs affected when a given component fails. Estimating blast radius requires
+      modeling the dependency graph: which services call the failing component, which services call those
+      callers, and which user-facing endpoints depend on the full call chain. A component with many
+      dependents has a large blast radius; a component with no upstream callers has a blast radius of one.
+
+      Cascade failure patterns arise when a dependency failure propagates upstream. The retry storm is
+      the most common cascade amplifier: when service A fails, its callers retry aggressively, multiplying
+      load on an already-degraded system. Exponential backoff with jitter is the standard mitigation:
+      each retry waits 2^n * (1 + random) seconds, spreading retry load over time rather than concentrating
+      it. Without jitter, synchronized retries from many callers create a thundering herd that prevents
+      recovery.
+
+      The circuit breaker pattern isolates blast radius by fast-failing calls to a degraded dependency.
+      When a circuit breaker opens, callers immediately receive an error (or fallback response) instead
+      of waiting for the dependency timeout. This prevents thread pool or connection pool exhaustion in
+      the caller, which would otherwise cause the caller to also become unavailable, extending the blast
+      radius to the caller's own dependents. The circuit breaker transitions to half-open state after a
+      timeout, allowing a probe request through to test recovery. If the probe succeeds, the circuit closes;
+      if it fails, the open state resets.
+
+      Cache hit ratio degradation is a leading indicator of cascade risk. When a high-volume service's
+      cache hit ratio drops below threshold, the underlying data store receives a cache miss storm: request
+      volume that was previously absorbed by the cache now hits the database or storage backend. The
+      backend's latency increases as it processes requests beyond its designed throughput. This latency
+      increase propagates upstream: the service's response time increases, timeouts begin firing in callers,
+      and error rates rise. If the cache was serving as a buffer between a high-volume frontend and a
+      low-throughput backend, cache failure can cause a complete outage of the dependent service.
+
+      Monitoring for cascade risk requires tracking both the failure signal (error rate, latency) and
+      leading indicators (connection pool saturation, queue depth, cache hit ratio, thread pool utilization).
+      Alert on symptoms (SLO burn rate) for paging, and alert on leading indicators for warning. A high
+      error rate alert fires after user impact has already occurred; a connection pool saturation alert
+      fires before it. The goal is to close the detection window — the time between the failure beginning
+      and the on-call engineer being notified — to under five minutes for P1 incidents.
+
+      Runbooks formalize the response to known failure modes. A well-written runbook for a cascade failure
+      scenario describes: how to identify the root cause service (the deepest degraded dependency in the
+      call chain), how to verify the blast radius (which upstream services are exhibiting symptoms), the
+      specific remediation steps for the root cause, and how to verify recovery in dependency order (fix
+      root cause first, then verify each upstream service as it recovers). The most common error in cascade
+      response is treating symptoms rather than root cause: restarting an affected service before fixing
+      the failing dependency just causes re-failure.
+
+      Time to detect (TTD) and time to resolve (TTR) are the primary operational metrics for incident
+      response quality. TTD is the interval between the failure starting and the on-call engineer being
+      paged. TTR is the interval between paging and service restoration. Mean TTD reflects monitoring
+      effectiveness; mean TTR reflects runbook quality and on-call preparedness. Post-incident reviews
+      (postmortems) should measure both and track them over time. A rising mean TTD indicates monitoring
+      coverage gaps; a rising mean TTR indicates runbook gaps or insufficient on-call training.
+
+      Memory pressure at the platform level — whether in Kubernetes nodes, database connection pools,
+      or reverse proxy worker processes — is a common cascade trigger. When memory becomes constrained,
+      systems begin evicting or rejecting work. A cache loses entries, causing hit ratio to fall. A
+      connection pool becomes saturated, causing latency to spike. A load balancer begins rejecting
+      connections, causing error rates to rise. Each of these is a failure mode with a distinct runbook,
+      but all share the same upstream cause: insufficient memory headroom in the system's design.
+      Capacity planning that maintains 30-40% memory headroom at steady-state provides a buffer against
+      demand spikes and prevents memory pressure from becoming a cascade initiator.
+
+      The relationship between error budget and blast radius determines deployment risk. Before a change
+      that could increase blast radius — adding a new dependency, increasing connection pool limits,
+      deploying to a shared database — verify that sufficient error budget remains to absorb a potential
+      failure. If the error budget is already depleted, freeze changes and focus on reliability
+      improvements. The error budget is not just a metric; it is the mechanism by which reliability
+      and velocity are kept in balance across the organization.

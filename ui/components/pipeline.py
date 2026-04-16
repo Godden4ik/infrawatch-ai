@@ -34,6 +34,8 @@ def iter_pipeline_events(verbose: bool = False, llm_provider: str = "anthropic",
             try:
                 async for event in stream_pipeline(verbose=verbose, llm_provider=llm_provider, llm_model=llm_model):
                     q.put(event)
+            except Exception as exc:
+                q.put(exc)
             finally:
                 q.put(None)  # sentinel — always signals completion
 
@@ -45,6 +47,8 @@ def iter_pipeline_events(verbose: bool = False, llm_provider: str = "anthropic",
         item = q.get(timeout=300)  # 5-minute hard timeout
         if item is None:
             break
+        if isinstance(item, Exception):
+            raise item
         yield item
 
 

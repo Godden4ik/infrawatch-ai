@@ -2,7 +2,7 @@
 
 import { motion } from "motion/react";
 import type { RagResult } from "@/services/rag/schema";
-import { Network, FileText, AlertTriangle, Database } from "lucide-react";
+import { Network, FileText, AlertTriangle, FileQuestion } from "lucide-react";
 
 interface ComparisonChartProps {
   data: RagResult;
@@ -76,8 +76,11 @@ function MetricCard({ label, graphrag, naive, icon: Icon, unit = "", delay }: Me
 }
 
 export function ComparisonChart({ data }: ComparisonChartProps) {
+  const grChunks = data.graphrag.chunk_results?.length ?? 0;
+  const naiveChunks = data.naive.chunk_results?.length ?? 0;
+
   return (
-    <div className="grid gap-3 sm:grid-cols-3">
+    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
       <MetricCard
         label="Runbooks Retrieved"
         graphrag={data.graphrag.runbook_results.length}
@@ -99,6 +102,14 @@ export function ComparisonChart({ data }: ComparisonChartProps) {
         icon={Network}
         unit={data.graphrag.service_context ? "yes" : "no"}
         delay={0.16}
+      />
+      <MetricCard
+        label="Noise Chunks Labeled"
+        graphrag={grChunks}
+        naive={0}
+        icon={FileQuestion}
+        unit={grChunks > 0 ? "identified" : "none"}
+        delay={0.24}
       />
     </div>
   );

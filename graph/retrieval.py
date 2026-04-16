@@ -103,6 +103,35 @@ RETURN svc.name AS service,
        collect(DISTINCT {name: upstream.name, rel: type(r2)}) AS upstream
 """
 
+# ── Chunk retrieval ──────────────────────────────────────────────────
+
+GRAPHRAG_CHUNK_QUERY = """
+CALL db.index.vector.queryNodes('knowledge_chunk_embedding', $k, $embedding)
+YIELD node AS chunk, score
+MATCH (nd:NoiseDocument)-[:HAS_CHUNK]->(chunk)
+OPTIONAL MATCH (nd)-[:APPLIES_TO]->(svc:Service)
+RETURN chunk.id AS chunk_id,
+       chunk.chunk_index AS chunk_index,
+       chunk.content AS content,
+       nd.id AS document_id,
+       nd.title AS document_title,
+       nd.source_system AS source_system,
+       collect(DISTINCT svc.name) AS related_services,
+       score
+ORDER BY score DESC
+"""
+
+NAIVE_CHUNK_QUERY = """
+CALL db.index.vector.queryNodes('knowledge_chunk_embedding', $k, $embedding)
+YIELD node AS chunk, score
+MATCH (nd:NoiseDocument)-[:HAS_CHUNK]->(chunk)
+RETURN chunk.id AS chunk_id,
+       chunk.content AS content,
+       nd.title AS document_title,
+       score
+ORDER BY score DESC
+"""
+
 # ── Naive RAG retrieval ──────────────────────────────────────────────
 
 NAIVE_RUNBOOK_QUERY = """
@@ -171,10 +200,17 @@ async def graphrag_retrieve(
                 if rec:
                     svc_context = dict(rec)
 
+            # Chunk search — surfaces noise docs with no service relationships
+            result = await session.run(
+                GRAPHRAG_CHUNK_QUERY, k=top_k, embedding=embedding
+            )
+            chunk_results = [dict(r) async for r in result]
+
         return {
             "runbook_results": runbook_results,
             "incident_results": incident_results,
             "service_context": svc_context,
+            "chunk_results": chunk_results,
         }
     finally:
         await driver.close()
@@ -207,9 +243,16 @@ async def naive_rag_retrieve(
             )
             incident_results = [dict(r) async for r in result]
 
+            # Chunk search — no service context, flat similarity only
+            result = await session.run(
+                NAIVE_CHUNK_QUERY, k=top_k, embedding=embedding
+            )
+            chunk_results = [dict(r) async for r in result]
+
         return {
             "runbook_results": runbook_results,
             "incident_results": incident_results,
+            "chunk_results": chunk_results,
         }
     finally:
         await driver.close()
