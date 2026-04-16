@@ -117,7 +117,7 @@ class TestMonitorNode:
         with patch("agents.monitor.get_llm", return_value=mock_llm) as mock_get_llm:
             await monitor_node(state=_BASE_STATE, tools=[], llm_provider="ollama", llm_model="llama3.1")
 
-        mock_get_llm.assert_called_once_with(provider="ollama", model="llama3.1")
+        mock_get_llm.assert_called_once_with(provider="ollama", model="llama3.1", api_key=None)
 
     @pytest.mark.asyncio
     async def test_hallucinated_anomalies_without_required_fields_rejected(self):

@@ -6,7 +6,7 @@ import re
 
 from langchain_core.tools import BaseTool
 
-from agents.config import get_llm
+from agents.providers import get_llm
 
 logger = logging.getLogger(__name__)
 from agents.llm_utils import run_agent_with_tools
@@ -25,13 +25,13 @@ def _parse_analysis(text: str) -> dict:
     return {}
 
 
-async def analyst_node(state: PipelineState, tools: list[BaseTool], llm_provider: str = "anthropic", llm_model: str | None = None) -> dict:
+async def analyst_node(state: PipelineState, tools: list[BaseTool], llm_provider: str = "anthropic", llm_model: str | None = None, api_key: str | None = None) -> dict:
     """Analyze anomalies by querying the dependency graph for root cause."""
     logger.info("=== ANALYST AGENT ===")
     logger.info("  Analyzing %d anomaly(ies) across: %s",
                 len(state["anomalies"]),
                 ", ".join({a.get("service", "?") for a in state["anomalies"]}))
-    llm = get_llm(provider=llm_provider, model=llm_model)
+    llm = get_llm(provider=llm_provider, model=llm_model, api_key=api_key)
     anomalies_json = json.dumps(state["anomalies"], indent=2)
     messages, content = await run_agent_with_tools(
         llm=llm,

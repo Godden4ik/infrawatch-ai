@@ -8,7 +8,7 @@ from agents.tools import ANALYST_TOOLS, MONITOR_TOOLS, RESPONDER_TOOLS, create_m
 from langchain_mcp_adapters.tools import load_mcp_tools
 
 
-async def run_pipeline(verbose: bool = True, llm_provider: str = "anthropic", llm_model: str | None = None) -> dict:
+async def run_pipeline(verbose: bool = True, llm_provider: str = "anthropic", llm_model: str | None = None, api_key: str | None = None) -> dict:
     """Run the full agent pipeline with persistent MCP server sessions.
 
     Opens one session per MCP server and keeps it alive for the full pipeline,
@@ -40,6 +40,7 @@ async def run_pipeline(verbose: bool = True, llm_provider: str = "anthropic", ll
             responder_tools=filter_tools(all_tools, RESPONDER_TOOLS),
             llm_provider=llm_provider,
             llm_model=llm_model,
+            api_key=api_key,
         )
 
         initial_state = {
@@ -59,7 +60,7 @@ async def run_pipeline(verbose: bool = True, llm_provider: str = "anthropic", ll
         return await compiled.ainvoke(initial_state)
 
 
-async def stream_pipeline(verbose: bool = False, llm_provider: str = "anthropic", llm_model: str | None = None):
+async def stream_pipeline(verbose: bool = False, llm_provider: str = "anthropic", llm_model: str | None = None, api_key: str | None = None):
     """Async generator yielding LangGraph astream_events for the pipeline.
 
     All anyio cancel scopes (MCP stdio sessions) are confined to a single
@@ -95,6 +96,7 @@ async def stream_pipeline(verbose: bool = False, llm_provider: str = "anthropic"
                     responder_tools=filter_tools(all_tools, RESPONDER_TOOLS),
                     llm_provider=llm_provider,
                     llm_model=llm_model,
+                    api_key=api_key,
                 )
 
                 initial_state = {

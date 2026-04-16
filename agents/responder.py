@@ -5,7 +5,7 @@ import logging
 
 from langchain_core.tools import BaseTool
 
-from agents.config import get_llm
+from agents.providers import get_llm
 
 logger = logging.getLogger(__name__)
 from agents.llm_utils import run_agent_with_tools
@@ -13,11 +13,11 @@ from agents.prompts import RESPONDER_SYSTEM_PROMPT
 from agents.state import PipelineState
 
 
-async def responder_node(state: PipelineState, tools: list[BaseTool], llm_provider: str = "anthropic", llm_model: str | None = None) -> dict:
+async def responder_node(state: PipelineState, tools: list[BaseTool], llm_provider: str = "anthropic", llm_model: str | None = None, api_key: str | None = None) -> dict:
     """Draft a remediation plan based on root cause and blast radius."""
     logger.info("=== RESPONDER AGENT ===")
     logger.info("  Root cause: %s", str(state.get("root_cause", ""))[:100])
-    llm = get_llm(provider=llm_provider, model=llm_model)
+    llm = get_llm(provider=llm_provider, model=llm_model, api_key=api_key)
     blast_json = json.dumps(state.get("blast_radius", []), indent=2)
     similar_json = json.dumps(state.get("similar_incidents", []), indent=2)
     runbooks_json = json.dumps(state.get("relevant_runbooks", []), indent=2)
