@@ -28,15 +28,8 @@ export default function ProvidersPage() {
     });
   }, []);
 
-  // A provider is "configured" if it has a sqlite key OR env key is available
-  const configuredIds = new Set<string>();
-  if (providersData) {
-    for (const p of providersData.providers) {
-      if (sqliteKeyIds.has(p.id) || p.available) {
-        configuredIds.add(p.id);
-      }
-    }
-  }
+  // A provider is "configured" if it has a runtime (sqlite) key
+  const configuredIds = sqliteKeyIds;
 
   return (
     <div className="mx-auto max-w-5xl space-y-6">

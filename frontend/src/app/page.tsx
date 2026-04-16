@@ -1,10 +1,11 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { motion } from "motion/react";
 import { healthQueryOptions } from "@/services/health/query-options";
 import { providerQueries } from "@/services/providers/query-options";
-import { StatusIndicator } from "@/components/layout/status-indicator";
+import { getKeyStatus } from "@/services/providers/actions";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -225,6 +226,21 @@ export default function HomePage() {
   const { data: providersData, isLoading: isLoadingProviders } = useQuery(
     providerQueries.list(),
   );
+  const [sqliteKeyIds, setSqliteKeyIds] = useState<Set<string>>(new Set());
+
+  useEffect(() => {
+    getKeyStatus().then((result) => {
+      if (result.success) {
+        setSqliteKeyIds(
+          new Set(
+            result.data
+              .filter((entry) => entry.hasKey)
+              .map((entry) => entry.providerId),
+          ),
+        );
+      }
+    });
+  }, []);
 
   const healthyCount = data
     ? Object.values(data.services).filter((s) => s === "healthy").length
@@ -238,8 +254,10 @@ export default function HomePage() {
     ? INFRA_SERVICES.filter((s) => s in data.services)
     : [];
 
-  const activeProviders = providersData
-    ? providersData.providers.filter((p) => p.available).length
+  const configuredProviders = providersData
+    ? providersData.providers.filter(
+        (provider) => !provider.requires_key || sqliteKeyIds.has(provider.id),
+      ).length
     : null;
 
   const systemStatus = data?.status;
@@ -319,11 +337,11 @@ export default function HomePage() {
             />
 
             <StatCard
-              label="Active Providers"
-              value={isLoadingProviders ? "…" : (activeProviders ?? "—")}
+              label="Configured Providers"
+              value={isLoadingProviders ? "…" : (configuredProviders ?? "—")}
               sub={
                 providersData
-                  ? `of ${providersData.providers.length} configured`
+                  ? `${providersData.providers.length - (configuredProviders ?? 0)} need setup`
                   : undefined
               }
             />
@@ -407,15 +425,39 @@ export default function HomePage() {
                 key={provider.id}
                 className="flex items-center gap-2 rounded-[var(--radius)] bg-muted/40 px-3 py-1.5"
               >
-                <span
-                  className={`h-1.5 w-1.5 rounded-full ${provider.available ? "bg-emerald-500 shadow-[0_0_5px_rgba(34,197,94,0.6)]" : "bg-muted-foreground"}`}
-                />
-                <span className="font-mono text-xs">{provider.name}</span>
-                {provider.requires_key && !provider.available && (
-                  <span className="text-[9px] uppercase tracking-wider text-amber-500">
-                    no key
-                  </span>
-                )}
+                {(() => {
+                  const configured =
+                    !provider.requires_key || sqliteKeyIds.has(provider.id);
+                  const healthy = provider.available;
+
+                  return (
+                    <>
+                      <span
+                        className={`h-1.5 w-1.5 rounded-full ${
+                          configured && healthy
+                            ? "bg-emerald-500 shadow-[0_0_5px_rgba(34,197,94,0.6)]"
+                            : configured
+                              ? "bg-blue-500 shadow-[0_0_5px_rgba(59,130,246,0.45)]"
+                              : "bg-muted-foreground"
+                        }`}
+                      />
+                      <span className="font-mono text-xs">{provider.name}</span>
+                      {!provider.requires_key ? (
+                        <span className="text-[9px] uppercase tracking-wider text-blue-400">
+                          local
+                        </span>
+                      ) : configured ? (
+                        <span className="text-[9px] uppercase tracking-wider text-blue-400">
+                          configured
+                        </span>
+                      ) : (
+                        <span className="text-[9px] uppercase tracking-wider text-amber-500">
+                          no key
+                        </span>
+                      )}
+                    </>
+                  );
+                })()}
               </div>
             ))}
           </div>
@@ -424,7 +466,8 @@ export default function HomePage() {
 
       {/* ── Refresh note ──────────────────────────────────────────────────── */}
       <p className="font-mono text-[10px] text-muted-foreground/50">
-        Auto-refreshes every 30s &middot; Last updated: {new Date().toLocaleTimeString()}
+        Auto-refreshes every 30s &middot; Last updated:{" "}
+        <span suppressHydrationWarning>{new Date().toLocaleTimeString()}</span>
       </p>
     </motion.div>
   );

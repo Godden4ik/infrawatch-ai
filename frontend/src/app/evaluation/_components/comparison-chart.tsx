@@ -2,7 +2,10 @@
 
 import { motion } from "motion/react";
 import type { RagResult } from "@/services/rag/schema";
-import { Network, FileText, AlertTriangle, Database } from "lucide-react";
+import { Card, CardContent } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Network, FileText, AlertTriangle, GitCompareArrows } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 interface ComparisonChartProps {
   data: RagResult;
@@ -13,93 +16,160 @@ interface MetricCardProps {
   graphrag: number;
   naive: number;
   icon: React.ElementType;
-  unit?: string;
   delay: number;
+  hint: string;
 }
 
-function MetricCard({ label, graphrag, naive, icon: Icon, unit = "", delay }: MetricCardProps) {
-  const winner = graphrag > naive ? "graphrag" : graphrag === naive ? "tie" : "naive";
+function MetricCard({
+  label,
+  graphrag,
+  naive,
+  icon: Icon,
+  delay,
+  hint,
+}: MetricCardProps) {
+  const maxValue = Math.max(graphrag, naive, 1);
+  const graphWidth = `${(graphrag / maxValue) * 100}%`;
+  const naiveWidth = `${(naive / maxValue) * 100}%`;
 
   return (
     <motion.div
       initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.3, delay }}
-      className="bg-secondary/30 rounded-xl p-5"
     >
-      <div className="mb-4 flex items-center gap-2.5">
-        <Icon className="text-muted-foreground h-4.5 w-4.5" />
-        <span className="text-muted-foreground text-sm font-medium">
-          {label}
-        </span>
-      </div>
-      <div className="flex gap-6">
-        {/* GraphRAG */}
-        <div className="flex-1">
-          <div className="mb-2 flex items-baseline gap-2">
-            <span className="font-mono text-3xl font-bold tabular-nums text-blue-400">
-              {graphrag}
-            </span>
-            {unit && <span className="text-muted-foreground text-sm">{unit}</span>}
+      <Card className="h-full p-0">
+        <CardContent className="space-y-4 p-3">
+          <div className="flex items-center gap-2.5">
+            <Icon className="h-4 w-4 text-primary" />
+            <div>
+              <p className="text-sm font-medium">{label}</p>
+              <p className="font-mono text-[10px] text-muted-foreground">
+                {hint}
+              </p>
+            </div>
           </div>
-          <div className="mb-1.5 h-2 w-full overflow-hidden rounded-full bg-blue-500/10">
-            <motion.div
-              className="h-full rounded-full bg-blue-500"
-              initial={{ width: 0 }}
-              animate={{ width: `${Math.min(100, (graphrag / Math.max(graphrag, naive, 1)) * 100)}%` }}
-              transition={{ duration: 0.6, delay: delay + 0.2 }}
-            />
+
+          <div className="space-y-3">
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between gap-3">
+                <span className="font-mono text-[11px] uppercase tracking-[0.16em] text-primary">
+                  GraphRAG
+                </span>
+                <span className="font-mono text-sm font-semibold tabular-nums text-foreground">
+                  {graphrag}
+                </span>
+              </div>
+              <div className="h-1.5 bg-primary/10">
+                <motion.div
+                  className="h-full bg-primary"
+                  initial={{ width: 0 }}
+                  animate={{ width: graphWidth }}
+                  transition={{ duration: 0.55, delay: delay + 0.15 }}
+                />
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between gap-3">
+                <span className="font-mono text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
+                  Naive
+                </span>
+                <span className="font-mono text-sm font-semibold tabular-nums text-foreground">
+                  {naive}
+                </span>
+              </div>
+              <div className="h-1.5 bg-muted/70">
+                <motion.div
+                  className="h-full bg-muted-foreground/55"
+                  initial={{ width: 0 }}
+                  animate={{ width: naiveWidth }}
+                  transition={{ duration: 0.55, delay: delay + 0.15 }}
+                />
+              </div>
+            </div>
           </div>
-          <span className="text-xs text-blue-400">GraphRAG</span>
-        </div>
-        {/* Naive */}
-        <div className="flex-1">
-          <div className="mb-2 flex items-baseline gap-2">
-            <span className="text-muted-foreground font-mono text-3xl font-bold tabular-nums">
-              {naive}
-            </span>
-            {unit && <span className="text-muted-foreground text-sm">{unit}</span>}
+
+          <div className="font-mono text-[10px] uppercase tracking-[0.16em] text-muted-foreground">
+            Delta {graphrag - naive >= 0 ? "+" : ""}
+            {graphrag - naive}
           </div>
-          <div className="bg-muted mb-1.5 h-2 w-full overflow-hidden rounded-full">
-            <motion.div
-              className="bg-muted-foreground/40 h-full rounded-full"
-              initial={{ width: 0 }}
-              animate={{ width: `${Math.min(100, (naive / Math.max(graphrag, naive, 1)) * 100)}%` }}
-              transition={{ duration: 0.6, delay: delay + 0.2 }}
-            />
-          </div>
-          <span className="text-muted-foreground text-xs">Naive RAG</span>
-        </div>
-      </div>
+        </CardContent>
+      </Card>
     </motion.div>
   );
 }
 
 export function ComparisonChart({ data }: ComparisonChartProps) {
+  const graphTotal =
+    data.graphrag.runbook_results.length + data.graphrag.incident_results.length;
+  const naiveTotal =
+    data.naive.runbook_results.length + data.naive.incident_results.length;
+  const contextKeyCount = data.graphrag.service_context
+    ? Object.keys(data.graphrag.service_context).length
+    : 0;
+
   return (
-    <div className="grid gap-3 sm:grid-cols-3">
-      <MetricCard
-        label="Runbooks Retrieved"
-        graphrag={data.graphrag.runbook_results.length}
-        naive={data.naive.runbook_results.length}
-        icon={FileText}
-        delay={0}
-      />
-      <MetricCard
-        label="Incidents Retrieved"
-        graphrag={data.graphrag.incident_results.length}
-        naive={data.naive.incident_results.length}
-        icon={AlertTriangle}
-        delay={0.08}
-      />
-      <MetricCard
-        label="Has Service Context"
-        graphrag={data.graphrag.service_context ? 1 : 0}
-        naive={0}
-        icon={Network}
-        unit={data.graphrag.service_context ? "yes" : "no"}
-        delay={0.16}
-      />
-    </div>
+    <Card className="h-full p-0">
+      <CardContent className="border-b border-border/60 p-4">
+        <div className="flex items-start justify-between gap-3">
+          <div className="space-y-1">
+            <h2 className="text-base font-semibold">Comparison Summary</h2>
+            <p className="text-sm text-muted-foreground">
+              Output counts and graph-context lift for current evaluation run.
+            </p>
+          </div>
+          <Badge
+            variant="outline"
+            className={cn(
+              "font-mono text-[10px] uppercase tracking-[0.16em]",
+              graphTotal >= naiveTotal
+                ? "border-primary/30 bg-primary/10 text-primary"
+                : "border-border text-muted-foreground",
+            )}
+          >
+            <GitCompareArrows className="mr-1 h-3 w-3" />
+            {graphTotal >= naiveTotal ? "graph lead" : "parity"}
+          </Badge>
+        </div>
+      </CardContent>
+
+      <CardContent className="space-y-3 p-4">
+        <div className="grid gap-3 md:grid-cols-2 2xl:grid-cols-4">
+          <MetricCard
+            label="Runbooks"
+            graphrag={data.graphrag.runbook_results.length}
+            naive={data.naive.runbook_results.length}
+            icon={FileText}
+            delay={0}
+            hint="retrieved procedures"
+          />
+          <MetricCard
+            label="Incidents"
+            graphrag={data.graphrag.incident_results.length}
+            naive={data.naive.incident_results.length}
+            icon={AlertTriangle}
+            delay={0.08}
+            hint="retrieved historical events"
+          />
+          <MetricCard
+            label="Total Evidence"
+            graphrag={graphTotal}
+            naive={naiveTotal}
+            icon={GitCompareArrows}
+            delay={0.16}
+            hint="combined result volume"
+          />
+          <MetricCard
+            label="Graph Context"
+            graphrag={contextKeyCount}
+            naive={0}
+            icon={Network}
+            delay={0.24}
+            hint="attached context keys"
+          />
+        </div>
+      </CardContent>
+    </Card>
   );
 }

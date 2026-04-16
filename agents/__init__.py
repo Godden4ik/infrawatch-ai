@@ -14,7 +14,7 @@ async def run_pipeline(verbose: bool = True, llm_provider: str = "anthropic", ll
     Opens one session per MCP server and keeps it alive for the full pipeline,
     so the Neo4j server (and its SentenceTransformer model) is loaded only once.
 
-    llm_provider: "anthropic" (default) or "ollama"
+    llm_provider: provider ID from agents.providers.PROVIDER_REGISTRY
     """
     if verbose:
         import logging
@@ -67,7 +67,7 @@ async def stream_pipeline(verbose: bool = False, llm_provider: str = "anthropic"
     dedicated asyncio Task so they are never entered/exited across task
     boundaries — avoiding the anyio "exit cancel scope in different task" error.
 
-    llm_provider: "anthropic" (default) or "ollama"
+    llm_provider: provider ID from agents.providers.PROVIDER_REGISTRY
     """
     if verbose:
         import logging

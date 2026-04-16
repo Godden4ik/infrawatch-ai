@@ -49,71 +49,71 @@ export function generateMockPipelineEvents(): StreamEvent[] {
 
   // Monitor agent
   for (const chunk of MONITOR_TOKENS.match(/.{1,20}/g) ?? []) {
-    events.push({ type: "token", agent: "monitor_node", content: chunk });
+    events.push({ type: "token", agent: "monitor", content: chunk });
   }
   events.push({
     type: "tool_start",
-    agent: "monitor_node",
+    agent: "monitor",
     tool: "execute_promql",
   });
   events.push({
     type: "tool_end",
-    agent: "monitor_node",
+    agent: "monitor",
     output: '{"status":"success","data":{"result":[{"metric":{"service":"redis-cache"},"value":[1710000000,"0.23"]}]}}',
   });
   events.push({
     type: "agent_complete",
-    agent: "monitor_node",
+    agent: "monitor",
     result: { anomalies_found: 3 },
   });
 
   // Analyst agent
   for (const chunk of ANALYST_TOKENS.match(/.{1,20}/g) ?? []) {
-    events.push({ type: "token", agent: "analyst_node", content: chunk });
+    events.push({ type: "token", agent: "analyst", content: chunk });
   }
   events.push({
     type: "tool_start",
-    agent: "analyst_node",
+    agent: "analyst",
     tool: "get_blast_radius",
   });
   events.push({
     type: "tool_end",
-    agent: "analyst_node",
+    agent: "analyst",
     output: '{"service":"redis-cache","affected":["payment-service","order-service","api-gateway"]}',
   });
   events.push({
     type: "tool_start",
-    agent: "analyst_node",
+    agent: "analyst",
     tool: "find_similar_incidents",
   });
   events.push({
     type: "tool_end",
-    agent: "analyst_node",
+    agent: "analyst",
     output: '{"incidents":[{"id":"inc-7","title":"redis memory pressure cascade"}]}',
   });
   events.push({
     type: "agent_complete",
-    agent: "analyst_node",
+    agent: "analyst",
     result: { root_cause: "redis-cache", affected_count: 3 },
   });
 
   // Responder agent
   for (const chunk of RESPONDER_TOKENS.match(/.{1,20}/g) ?? []) {
-    events.push({ type: "token", agent: "responder_node", content: chunk });
+    events.push({ type: "token", agent: "responder", content: chunk });
   }
   events.push({
     type: "tool_start",
-    agent: "responder_node",
+    agent: "responder",
     tool: "get_runbook_for_service",
   });
   events.push({
     type: "tool_end",
-    agent: "responder_node",
+    agent: "responder",
     output: '{"runbook":"Redis Cache Failure Recovery","steps":["Check pod health","Verify memory","Flush stale keys"]}',
   });
   events.push({
     type: "agent_complete",
-    agent: "responder_node",
+    agent: "responder",
     result: { actions_proposed: 5 },
   });
 

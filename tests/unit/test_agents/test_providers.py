@@ -43,10 +43,11 @@ def _make_openai_mock():
     mod = types.ModuleType("langchain_openai")
 
     class ChatOpenAI:
-        def __init__(self, model, temperature, openai_api_key=None):
+        def __init__(self, model, temperature, openai_api_key=None, base_url=None):
             self.model = model
             self.temperature = temperature
             self.openai_api_key = openai_api_key
+            self.base_url = base_url
 
     mod.ChatOpenAI = ChatOpenAI
     return mod
@@ -83,9 +84,9 @@ def _make_ollama_mock():
 # ---------------------------------------------------------------------------
 
 class TestProviderRegistry:
-    def test_registry_has_all_four_providers(self):
+    def test_registry_has_all_five_providers(self):
 
-        assert set(PROVIDER_REGISTRY.keys()) >= {"anthropic", "openai", "gemini", "ollama"}
+        assert set(PROVIDER_REGISTRY.keys()) >= {"anthropic", "openai", "gemini", "deepseek", "ollama"}
 
     def test_each_entry_has_required_keys(self):
 
@@ -113,6 +114,11 @@ class TestProviderRegistry:
         models = PROVIDER_REGISTRY["gemini"]["models"]
         assert isinstance(models, list) and len(models) > 0
 
+    def test_deepseek_has_non_empty_models_list(self):
+
+        models = PROVIDER_REGISTRY["deepseek"]["models"]
+        assert isinstance(models, list) and len(models) > 0
+
 
 # ---------------------------------------------------------------------------
 # get_llm factory tests
@@ -137,14 +143,20 @@ class TestGetLlm:
             llm = get_llm(provider="gemini")
             assert type(llm).__name__ == "ChatGoogleGenerativeAI"
 
+    def test_returns_deepseek(self):
+        with patch.dict(sys.modules, {"langchain_openai": _make_openai_mock()}):
+
+            llm = get_llm(provider="deepseek")
+            assert type(llm).__name__ == "ChatOpenAI"
+
     def test_returns_ollama(self):
         with patch.dict(sys.modules, {"langchain_ollama": _make_ollama_mock()}):
 
             llm = get_llm(provider="ollama")
             assert type(llm).__name__ == "ChatOllama"
 
-    def test_unknown_provider_raises_key_error(self):
-        with pytest.raises(KeyError):
+    def test_unknown_provider_raises_value_error(self):
+        with pytest.raises(ValueError, match="Unknown provider"):
             get_llm(provider="nonexistent_provider_xyz")
 
     # ── Model override ────────────────────────────────────────────────────────
@@ -166,6 +178,12 @@ class TestGetLlm:
 
             llm = get_llm(provider="ollama", model="qwen2.5:14b")
             assert llm.model == "qwen2.5:14b"
+
+    def test_deepseek_uses_default_model(self):
+        with patch.dict(sys.modules, {"langchain_openai": _make_openai_mock()}):
+
+            llm = get_llm(provider="deepseek")
+            assert llm.model == PROVIDER_REGISTRY["deepseek"]["default_model"]
 
     # ── Temperature ───────────────────────────────────────────────────────────
 
@@ -203,3 +221,15 @@ class TestGetLlm:
 
             llm = get_llm(provider="openai", api_key="openai-runtime-key")
             assert llm.openai_api_key == "openai-runtime-key"
+
+    def test_runtime_api_key_overrides_env_for_deepseek(self):
+        with patch.dict(sys.modules, {"langchain_openai": _make_openai_mock()}):
+
+            llm = get_llm(provider="deepseek", api_key="deepseek-runtime-key")
+            assert llm.openai_api_key == "deepseek-runtime-key"
+
+    def test_deepseek_uses_default_base_url(self):
+        with patch.dict(sys.modules, {"langchain_openai": _make_openai_mock()}):
+
+            llm = get_llm(provider="deepseek")
+            assert llm.base_url == "https://api.deepseek.com"

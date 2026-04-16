@@ -6,9 +6,13 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { evaluateRag } from "@/services/rag/actions";
 import { ragKeys } from "@/services/rag/query-options";
 import { unwrap } from "@/services/_shared/safe-action";
-import { ProviderSelector, type ProviderSelection } from "@/components/provider-selector";
+import type { ProviderSelection } from "@/components/provider-selector";
+import { ProviderCombobox } from "@/components/provider-combobox";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Card, CardContent } from "@/components/ui/card";
+import { Textarea } from "@/components/ui/textarea";
+import { Separator } from "@/components/ui/separator";
 import { FlaskConical, Loader2, Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -39,7 +43,6 @@ export function EvalForm({ onQueryChange }: EvalFormProps) {
         serviceContext || undefined,
         judgeSelection.provider,
         judgeSelection.model || undefined,
-        judgeSelection.apiKey ?? undefined,
       );
       return unwrap(result);
     },
@@ -50,91 +53,111 @@ export function EvalForm({ onQueryChange }: EvalFormProps) {
   });
 
   return (
-    <div className="space-y-6">
-      {/* Query input — big and prominent */}
-      <div className="space-y-3">
-        <label className="text-muted-foreground text-xs font-medium uppercase tracking-widest">
-          Query
-        </label>
-        <div className="relative">
-          <textarea
+    <Card className="p-0">
+      <CardContent className="border-b border-border/60 p-4">
+        <div className="flex items-start justify-between gap-3">
+          <div className="space-y-1">
+            <h2 className="text-base font-semibold">Query Runner</h2>
+            <p className="text-sm text-muted-foreground">
+              Evaluate one infrastructure question against both retrieval
+              strategies.
+            </p>
+          </div>
+          <div className="bg-primary/10 px-2 py-1 font-mono text-[10px] uppercase tracking-[0.16em] text-primary ring-1 ring-inset ring-primary/20">
+            compare
+          </div>
+        </div>
+      </CardContent>
+
+      <CardContent className="space-y-4 p-4">
+        <div className="space-y-2">
+          <label className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+            Query
+          </label>
+          <Textarea
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Ask an infrastructure question..."
-            rows={3}
-            className={cn(
-              "bg-secondary/40 border-border/50 text-foreground placeholder:text-muted-foreground/40",
-              "w-full rounded-xl border px-5 py-4 text-base leading-relaxed",
-              "focus:border-primary/50 focus:ring-primary/20 focus:outline-none focus:ring-2",
-              "resize-none transition-all",
-            )}
+            rows={4}
+            className="min-h-[108px] resize-none bg-background/40 font-mono text-sm leading-relaxed"
           />
         </div>
-      </div>
 
-      {/* Preset queries */}
-      <div className="flex flex-wrap gap-2">
-        {PRESET_QUERIES.map((preset) => (
-          <button
-            key={preset}
-            onClick={() => setQuery(preset)}
-            className={cn(
-              "bg-secondary/50 hover:bg-secondary text-muted-foreground hover:text-foreground",
-              "rounded-lg px-3.5 py-2 text-sm transition-all",
-              query === preset && "bg-primary/10 text-primary border-primary/20 border",
-            )}
-          >
-            {preset.length > 45 ? preset.slice(0, 45) + "..." : preset}
-          </button>
-        ))}
-      </div>
+        <div className="space-y-2">
+          <label className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+            Preset Queries
+          </label>
+          <div className="flex flex-wrap gap-2">
+            {PRESET_QUERIES.map((preset) => (
+              <button
+                key={preset}
+                onClick={() => setQuery(preset)}
+                className={cn(
+                  "border border-border bg-background/40 px-2.5 py-1.5 text-left text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground",
+                  query === preset &&
+                    "border-primary/30 bg-primary/10 text-primary",
+                )}
+              >
+                {preset.length > 52 ? `${preset.slice(0, 52)}...` : preset}
+              </button>
+            ))}
+          </div>
+        </div>
 
-      {/* Judge LLM selector */}
-      <ProviderSelector
-        value={judgeSelection}
-        onChange={setJudgeSelection}
-        label="Judge LLM"
-      />
+        <Separator />
 
-      {/* Service context + submit */}
-      <div className="flex gap-3">
-        <div className="flex-1">
+        <ProviderCombobox
+          value={judgeSelection}
+          onChange={setJudgeSelection}
+          label="Judge LLM"
+        />
+
+        <div className="space-y-2">
+          <label className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+            Service Context
+          </label>
           <Input
             value={serviceContext}
             onChange={(e) => setServiceContext(e.target.value)}
-            placeholder="Service context (optional) — e.g. redis-cache"
-            className="bg-secondary/40 h-12 rounded-xl px-4 text-sm"
+            placeholder="Optional seed context — e.g. redis-cache"
+            className="bg-background/40 font-mono"
           />
         </div>
-        <Button
-          onClick={() => mutation.mutate()}
-          disabled={mutation.isPending || !query.trim()}
-          className="h-12 gap-2.5 rounded-xl px-8 text-base font-medium"
-          size="lg"
-        >
-          {mutation.isPending ? (
-            <>
-              <Loader2 className="h-5 w-5 animate-spin" />
-              Evaluating
-            </>
-          ) : (
-            <>
-              <FlaskConical className="h-5 w-5" />
-              Compare
-            </>
-          )}
-        </Button>
-      </div>
 
-      {mutation.isError && (
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          className="bg-destructive/10 text-destructive rounded-lg px-4 py-3 text-sm"
-        >
-          {mutation.error.message}
-        </motion.div>
-      )}
-    </div>
+        <div className="flex items-center justify-between gap-3 border-t border-border/60 pt-4">
+          <div className="flex items-center gap-2 font-mono text-[11px] text-muted-foreground">
+            <Sparkles className="h-3.5 w-3.5 text-primary" />
+            <span>One query. Same judge. Two retrieval paths.</span>
+          </div>
+          <Button
+            onClick={() => mutation.mutate()}
+            disabled={mutation.isPending || !query.trim()}
+            className="gap-2"
+          >
+            {mutation.isPending ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Evaluating
+              </>
+            ) : (
+              <>
+                <FlaskConical className="h-4 w-4" />
+                Compare
+              </>
+            )}
+          </Button>
+        </div>
+
+        {mutation.isError && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="border border-destructive/30 bg-destructive/10 px-3 py-2 font-mono text-xs text-destructive"
+          >
+            {mutation.error.message}
+          </motion.div>
+        )}
+      </CardContent>
+    </Card>
   );
 }

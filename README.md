@@ -68,7 +68,7 @@ cp .env.example .env
 cd frontend
 pnpm install
 pnpm dev          # http://localhost:3001  (uses MSW mocks — no backend needed)
-pnpm test         # Vitest: 51 unit tests
+pnpm test         # Vitest: 49 unit tests
 pnpm build        # Production build
 ```
 
@@ -78,8 +78,8 @@ pnpm build        # Production build
 |------|-------|-------------|
 | **Home** | `/` | System status overview — live health indicators for all services |
 | **Dashboard** | `/dashboard` | Real-time P95 latency and error-rate charts per service |
-| **Anomaly Injection** | `/anomaly` | Inject cascade / latency / error scenarios; reset |
-| **Agent Pipeline** | `/pipeline` | Live SSE stream of Monitor → Analyst → Responder with agent stepper |
+| **Anomaly Injection** | `/anomaly` | Dense fault-control surface with manual injection, cascade controls, active fault ledger, and event journal |
+| **Agent Pipeline** | `/pipeline` | Split-pane SSE runtime console for Monitor → Analyst → Responder with compact flow rail and live trace |
 | **Topology** | `/topology` | Interactive force-directed dependency graph + blast-radius panel |
 | **GraphRAG Eval** | `/evaluation` | Side-by-side GraphRAG vs Naive RAG comparison with Plotly charts |
 
@@ -126,11 +126,11 @@ python graph/ingest.py  # embeds runbooks + incidents
 
 **2. Open the dashboard** at [http://localhost:3001](http://localhost:3001) — Home page shows green status indicators for all services.
 
-**3. Inject a cascade failure** — go to **Anomaly Injection** and click **💥 Inject Cascade Failure**. This brings Redis down and degrades Payment + Order services.
+**3. Inject a cascade failure** — go to **Anomaly Injection** and run the **Inject cascade** action from the preset scenarios panel. This brings Redis down and degrades Payment + Order services.
 
 **4. Wait ~60 seconds** for Prometheus to scrape the new values.
 
-**5. Run the agent pipeline** — go to **Agent Pipeline**, select **Anthropic** in the sidebar, click **▶ Run**. Watch the animated agent stepper and live token stream as Monitor, Analyst, and Responder complete in sequence:
+**5. Run the agent pipeline** — go to **Agent Pipeline**, select **Anthropic** in the control pane, click **Launch trace**. Watch the runtime flow rail and live token stream as Monitor, Analyst, and Responder complete in sequence:
 - **Monitor** detects elevated latency and cache hit ratio drop
 - **Analyst** traces the root cause through the Neo4j dependency graph
 - **Responder** drafts a remediation plan citing runbook IDs (rendered as Markdown)
@@ -142,7 +142,7 @@ python graph/ingest.py  # embeds runbooks + incidents
 - Context Richness: GraphRAG returns structured service relationship fields; Naive RAG returns none
 - LLM judge scores are similar — same documents retrieved; topology enrichment is the differentiator
 
-**8. Reset** — return to Anomaly Injection, click **✅ Reset All Services**.
+**8. Reset** — return to **Anomaly Injection**, use **Reset all services**, and confirm the fault ledger clears.
 
 ## Anomaly Injection
 
@@ -171,7 +171,7 @@ Run the full Monitor → Analyst → Responder pipeline:
 python -c "import asyncio; from agents import run_pipeline; print(asyncio.run(run_pipeline()))"
 ```
 
-Or use the **Run** button on the Agent Pipeline page — the FastAPI backend streams SSE events to the Next.js frontend, rendering each token and tool call in real time.
+Or use **Launch trace** on the Agent Pipeline page — the FastAPI backend streams SSE events to the Next.js frontend, rendering each token and tool call in real time.
 
 The pipeline uses persistent MCP server sessions — the Neo4j server (and its embedding model) loads once per run, not once per tool call.
 
@@ -182,6 +182,7 @@ Both the agent pipeline and the GraphRAG evaluation support switching backends a
 | Backend | How to use | Notes |
 |---------|-----------|-------|
 | **Anthropic (default)** | Set `ANTHROPIC_API_KEY` in `.env` | Claude Haiku — reliable structured tool calling |
+| **DeepSeek** | Set `DEEPSEEK_API_KEY` in `.env` | OpenAI-compatible endpoint; `deepseek-chat` default, `deepseek-reasoner` optional |
 | **Ollama (local)** | `ollama serve` + model pulled | Selected per-run in the UI sidebar / eval page; set `OLLAMA_URL` if not on localhost |
 
 ```bash
@@ -198,6 +199,7 @@ The CLI also accepts a provider flag via the Python API:
 import asyncio
 from agents import run_pipeline
 asyncio.run(run_pipeline(llm_provider="ollama", llm_model="qwen2.5:14b"))
+asyncio.run(run_pipeline(llm_provider="deepseek", llm_model="deepseek-chat"))
 ```
 
 ## MCP Servers
@@ -232,7 +234,7 @@ pytest tests/e2e/          # 4 full-stack scenario tests
 pytest                     # All Python tests
 
 # JavaScript tests (frontend)
-cd frontend && pnpm test   # 51 Vitest tests — schemas, utils, components
+cd frontend && pnpm test   # 49 Vitest tests — schemas, utils, components
 ```
 
 ## Repository Layout

@@ -2,6 +2,7 @@ import { BrainCircuit } from "lucide-react";
 import Anthropic from "@lobehub/icons/es/Anthropic";
 import OpenAI from "@lobehub/icons/es/OpenAI";
 import Gemini from "@lobehub/icons/es/Gemini";
+import DeepSeek from "@lobehub/icons/es/DeepSeek";
 import Ollama from "@lobehub/icons/es/Ollama";
 import type { FC } from "react";
 
@@ -29,6 +30,11 @@ const PROVIDER_DISPLAY: Record<string, ProviderDisplay> = {
     icon: Gemini.Color,
     color: "#4285F4",
     description: "Gemini models",
+  },
+  deepseek: {
+    icon: DeepSeek,
+    color: "#4D6BFE",
+    description: "DeepSeek models",
   },
   ollama: {
     icon: Ollama,

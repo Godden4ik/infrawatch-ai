@@ -2,6 +2,7 @@
 
 import { serverFetch, apiBackendUrl } from "@/services/_shared/fetch-server";
 import { safeAction } from "@/services/_shared/safe-action";
+import { getProviderKey } from "@/db/provider-keys";
 import type { RagResult } from "./schema";
 
 export async function evaluateRag(
@@ -9,7 +10,6 @@ export async function evaluateRag(
   serviceContext?: string,
   judgeProvider?: string,
   judgeModel?: string,
-  judgeApiKey?: string,
 ) {
   return safeAction(
     () =>
@@ -22,7 +22,7 @@ export async function evaluateRag(
           top_k: 5,
           judge_provider: judgeProvider ?? null,
           judge_model: judgeModel ?? null,
-          judge_api_key: judgeApiKey ?? null,
+          judge_api_key: judgeProvider ? getProviderKey(judgeProvider) : null,
         }),
       }),
     { code: "RAG_EVAL_FAILED", message: "Failed to evaluate RAG" },

@@ -11,6 +11,7 @@ export type Toast = {
 
 type Listener = () => void;
 
+const EMPTY_TOASTS: Toast[] = [];
 let toasts: Toast[] = [];
 const listeners = new Set<Listener>();
 
@@ -56,5 +57,5 @@ export const toast = {
 };
 
 export function useToasts(): Toast[] {
-  return useSyncExternalStore(subscribe, getSnapshot, () => []);
+  return useSyncExternalStore(subscribe, getSnapshot, () => EMPTY_TOASTS);
 }

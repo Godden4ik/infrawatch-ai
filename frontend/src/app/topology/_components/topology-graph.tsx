@@ -1,164 +1,240 @@
 "use client";
 
-import { useCallback, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
-  ReactFlow,
   Background,
+  BackgroundVariant,
   Controls,
-  type Node,
-  type Edge,
+  ReactFlow,
+  type EdgeTypes,
+  type NodeTypes,
   type NodeMouseHandler,
+  Position,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import { topologyQueryOptions } from "@/services/graph/query-options";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  TopologyEdge,
+  type TopologyGraphEdge,
+} from "./topology-edge";
+import {
+  TopologyNode,
+  type TopologyGraphNode,
+} from "./topology-node";
 
 interface TopologyGraphProps {
   selectedService: string | null;
   affectedServices: string[];
   onNodeClick: (serviceName: string) => void;
+  onPaneClick?: () => void;
 }
+
+const FIXED_POSITIONS: Record<string, { x: number; y: number }> = {
+  "api-gateway": { x: 0, y: 40 },
+  "order-service": { x: -320, y: 290 },
+  "payment-service": { x: 0, y: 290 },
+  "user-service": { x: 320, y: 290 },
+  "redis-cache": { x: 0, y: 570 },
+};
+
+const nodeTypes: NodeTypes = {
+  topology: TopologyNode,
+};
+
+const edgeTypes: EdgeTypes = {
+  topology: TopologyEdge,
+};
 
 export function TopologyGraph({
   selectedService,
   affectedServices,
   onNodeClick,
+  onPaneClick,
 }: TopologyGraphProps) {
   const { data, isLoading } = useQuery(topologyQueryOptions);
 
-  const nodes: Node[] = useMemo(() => {
-    if (!data) return [];
-    const count = data.nodes.length;
-    const radius = 280;
-    const cx = 400;
-    const cy = 380;
-    return data.nodes.map((n, i) => {
-      const angle = (2 * Math.PI * i) / count - Math.PI / 2;
-      const isSelected = n.name === selectedService;
-      const isAffected = affectedServices.includes(n.name);
-      return {
-        id: n.name,
-        position: {
-          x: cx + radius * Math.cos(angle),
-          y: cy + radius * Math.sin(angle),
-        },
-        data: { label: n.name },
-        style: {
-          background: isSelected
-            ? "#3b82f6"
-            : isAffected
-              ? "rgba(239, 68, 68, 0.12)"
-              : "rgba(30, 41, 59, 0.85)",
-          color: isSelected ? "#ffffff" : isAffected ? "#fca5a5" : "#e2e8f0",
-          border: isSelected
-            ? "2px solid #60a5fa"
-            : isAffected
-              ? "1px solid rgba(239, 68, 68, 0.4)"
-              : "1px solid rgba(71, 85, 105, 0.4)",
-          borderRadius: "12px",
-          padding: "14px 24px",
-          fontSize: "13px",
-          fontFamily: "var(--font-mono), monospace",
-          fontWeight: isSelected || isAffected ? 600 : 500,
-          letterSpacing: "0.01em",
-          boxShadow: isSelected
-            ? "0 0 20px rgba(59, 130, 246, 0.25), 0 4px 12px rgba(0,0,0,0.2)"
-            : isAffected
-              ? "0 0 16px rgba(239, 68, 68, 0.15)"
-              : "0 2px 8px rgba(0,0,0,0.15)",
-          cursor: "pointer",
-        },
-      };
-    });
-  }, [data, selectedService, affectedServices]);
+  const nodes: TopologyGraphNode[] = !data
+    ? []
+    : data.nodes.map((node) => {
+        const isSelected = node.name === selectedService;
+        const isAffected = affectedServices.includes(node.name);
 
-  const edges: Edge[] = useMemo(() => {
-    if (!data) return [];
-    return data.edges.map((e, i) => ({
-      id: `e-${i}`,
-      source: e.source,
-      target: e.target,
-      label: e.relationship,
-      animated:
-        affectedServices.includes(e.source) ||
-        affectedServices.includes(e.target),
-      style: {
-        stroke: affectedServices.includes(e.source) || affectedServices.includes(e.target)
-          ? "rgba(239, 68, 68, 0.5)"
-          : "rgba(71, 85, 105, 0.5)",
-        strokeWidth: 1.5,
-      },
-      labelStyle: {
-        fontSize: 11,
-        fill: "#94a3b8",
-        fontFamily: "var(--font-mono), monospace",
-        letterSpacing: "0.03em",
-      },
-      labelBgStyle: { fill: "rgba(15, 23, 42, 0.9)", fillOpacity: 1 },
-      labelBgPadding: [6, 8] as [number, number],
-      labelBgBorderRadius: 6,
-    }));
-  }, [data, affectedServices]);
+        return {
+          id: node.name,
+          type: "topology",
+          sourcePosition: Position.Bottom,
+          targetPosition: Position.Top,
+          position: FIXED_POSITIONS[node.name] ?? { x: 0, y: 0 },
+          data: {
+            name: node.name,
+            typeLabel: node.type ?? "service",
+            labels: node.labels.slice(0, 1),
+            selected: isSelected,
+            affected: isAffected,
+          },
+        };
+      });
 
-  const handleNodeClick: NodeMouseHandler = useCallback(
-    (_, node) => onNodeClick(node.id),
-    [onNodeClick],
-  );
+  const edges: TopologyGraphEdge[] = !data
+    ? []
+    : data.edges.map((edge, index) => {
+        const isSelected =
+          edge.source === selectedService || edge.target === selectedService;
+        const isAffected =
+          affectedServices.includes(edge.source) ||
+          affectedServices.includes(edge.target);
+        const routeKey = `${edge.source}->${edge.target}`;
+        const routeMeta: Record<
+          string,
+          { routeGroup: "gateway" | "datastore" | "lateral"; lane: number }
+        > = {
+          "api-gateway->order-service": { routeGroup: "gateway", lane: 0 },
+          "api-gateway->payment-service": { routeGroup: "gateway", lane: 1 },
+          "api-gateway->user-service": { routeGroup: "gateway", lane: 2 },
+          "order-service->redis-cache": { routeGroup: "datastore", lane: 0 },
+          "payment-service->redis-cache": { routeGroup: "datastore", lane: 1 },
+          "user-service->redis-cache": { routeGroup: "datastore", lane: 2 },
+          "order-service->payment-service": { routeGroup: "lateral", lane: 0 },
+        };
+        const route = routeMeta[routeKey] ?? {
+          routeGroup: "gateway" as const,
+          lane: 0,
+        };
 
-  if (isLoading) return <Skeleton className="h-full w-full rounded-xl" />;
+        return {
+          id: `edge-${index}-${edge.source}-${edge.target}`,
+          type: "topology",
+          source: edge.source,
+          target: edge.target,
+          label: edge.relationship.replaceAll("_", " "),
+          data: {
+            affected: isAffected,
+            selected: isSelected,
+            routeGroup: route.routeGroup,
+            lane: route.lane,
+          },
+        };
+      });
+
+  const handleNodeClick: NodeMouseHandler = (_, node) => {
+    onNodeClick(node.id);
+  };
+
+  if (isLoading) {
+    return <Skeleton className="h-full w-full" />;
+  }
 
   return (
-    <div className="h-full w-full">
+    <div className="relative h-full w-full">
       <style>{`
+        @keyframes topology-dash {
+          to {
+            stroke-dashoffset: -48;
+          }
+        }
+
+        .topology-edge-path {
+          fill: none;
+          stroke: var(--muted-foreground);
+          stroke-opacity: 0.42;
+          stroke-width: 1.75;
+          stroke-dasharray: 4 7;
+          animation: topology-dash 14s linear infinite;
+        }
+
+        .topology-edge-path--selected {
+          stroke: var(--primary);
+          stroke-opacity: 0.9;
+          animation-duration: 8s;
+        }
+
+        .topology-edge-path--affected {
+          stroke: var(--destructive);
+          stroke-opacity: 0.72;
+          animation-duration: 6s;
+        }
+
         .react-flow__controls {
-          background: rgba(15, 23, 42, 0.92) !important;
-          border: 1px solid rgba(71, 85, 105, 0.4) !important;
-          border-radius: 10px !important;
-          box-shadow: 0 4px 16px rgba(0,0,0,0.3) !important;
+          background: color-mix(in oklab, var(--card) 92%, transparent) !important;
+          border: 1px solid color-mix(in oklab, var(--border) 100%, transparent) !important;
+          border-radius: 0 !important;
+          box-shadow: 0 10px 24px rgba(0, 0, 0, 0.24) !important;
           overflow: hidden !important;
         }
+
         .react-flow__controls-button {
           background: transparent !important;
-          border-bottom: 1px solid rgba(71, 85, 105, 0.25) !important;
-          fill: #94a3b8 !important;
-          color: #94a3b8 !important;
-          width: 32px !important;
-          height: 32px !important;
+          border-bottom: 1px solid color-mix(in oklab, var(--border) 90%, transparent) !important;
+          color: var(--muted-foreground) !important;
+          fill: var(--muted-foreground) !important;
+          width: 34px !important;
+          height: 34px !important;
         }
+
         .react-flow__controls-button:hover {
-          background: rgba(59, 130, 246, 0.12) !important;
-          fill: #60a5fa !important;
+          background: color-mix(in oklab, var(--card) 75%, var(--primary) 25%) !important;
+          color: var(--foreground) !important;
+          fill: var(--foreground) !important;
         }
+
         .react-flow__controls-button:last-child {
-          border-bottom: none !important;
+          border-bottom: 0 !important;
         }
-        .react-flow__controls-button svg {
-          max-width: 14px !important;
-          max-height: 14px !important;
-        }
-        .react-flow__edge-textbg {
-          fill: rgba(15, 23, 42, 0.9) !important;
-        }
-        .react-flow__edge-text {
-          fill: #94a3b8 !important;
-        }
+
         .react-flow__pane {
           cursor: grab !important;
         }
+
+        .react-flow__pane.dragging {
+          cursor: grabbing !important;
+        }
       `}</style>
-      <ReactFlow
+
+      <div className="pointer-events-none absolute top-3 left-3 z-10 flex flex-wrap items-center gap-2">
+        <div className="border border-border/80 bg-background/92 px-2.5 py-1.5 font-mono text-[10px] uppercase tracking-[0.16em] text-muted-foreground backdrop-blur-sm">
+          Click node to inspect
+        </div>
+        <div className="border border-border/80 bg-background/92 px-2.5 py-1.5 backdrop-blur-sm">
+          <div className="flex items-center gap-3 font-mono text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
+            <span className="inline-flex items-center gap-1.5">
+              <span className="h-2 w-2 rounded-full bg-chart-2" />
+              Normal
+            </span>
+            <span className="inline-flex items-center gap-1.5">
+              <span className="h-2 w-2 rounded-full bg-primary" />
+              Selected
+            </span>
+            <span className="inline-flex items-center gap-1.5">
+              <span className="h-2 w-2 rounded-full bg-destructive" />
+              Affected
+            </span>
+          </div>
+        </div>
+      </div>
+
+      <ReactFlow<TopologyGraphNode, TopologyGraphEdge>
         nodes={nodes}
         edges={edges}
+        nodeTypes={nodeTypes}
+        edgeTypes={edgeTypes}
         onNodeClick={handleNodeClick}
+        onPaneClick={onPaneClick}
         fitView
-        fitViewOptions={{ padding: 0.3 }}
+        fitViewOptions={{ padding: 0.12, maxZoom: 1 }}
+        minZoom={0.45}
+        maxZoom={1.8}
+        nodesDraggable={false}
+        elementsSelectable={false}
         proOptions={{ hideAttribution: true }}
-        minZoom={0.3}
-        maxZoom={2}
       >
-        <Background color="rgba(71, 85, 105, 0.08)" gap={24} size={1} />
-        <Controls position="bottom-right" />
+        <Background
+          variant={BackgroundVariant.Lines}
+          gap={32}
+          size={1}
+          color="var(--border)"
+        />
+        <Controls position="bottom-right" showInteractive={false} />
       </ReactFlow>
     </div>
   );

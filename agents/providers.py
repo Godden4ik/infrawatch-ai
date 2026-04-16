@@ -52,6 +52,18 @@ PROVIDER_REGISTRY: dict[str, dict[str, Any]] = {
             "gemini-1.5-pro",
         ],
     },
+    "deepseek": {
+        "name": "DeepSeek",
+        "module": "langchain_openai",
+        "class": "ChatOpenAI",
+        "key_env": "DEEPSEEK_API_KEY",
+        "key_kwarg": "openai_api_key",
+        "default_model": "deepseek-chat",
+        "models": [
+            "deepseek-chat",
+            "deepseek-reasoner",
+        ],
+    },
     "ollama": {
         "name": "Ollama",
         "module": "langchain_ollama",
@@ -84,6 +96,11 @@ def _build_provider_kwargs(
 
     if provider == "ollama":
         kwargs["base_url"] = os.getenv("OLLAMA_URL", "http://localhost:11434")
+    elif provider == "deepseek":
+        kwargs["base_url"] = os.getenv("DEEPSEEK_BASE_URL", "https://api.deepseek.com")
+        resolved_key = api_key or (os.getenv(entry["key_env"]) if entry["key_env"] else None)
+        if resolved_key is not None:
+            kwargs[entry["key_kwarg"]] = resolved_key
     elif entry.get("key_kwarg"):
         resolved_key = api_key or (os.getenv(entry["key_env"]) if entry["key_env"] else None)
         if resolved_key is not None:
@@ -107,9 +124,12 @@ def get_llm(
     Uses dynamic importlib so optional provider packages (langchain_openai,
     langchain_google_genai, etc.) are only imported when actually needed.
 
-    Raises KeyError for unknown provider IDs.
+    Raises ValueError for unknown provider IDs.
     """
-    entry = PROVIDER_REGISTRY[provider]  # KeyError for unknown providers
+    entry = PROVIDER_REGISTRY.get(provider)
+    if entry is None:
+        available = ", ".join(sorted(PROVIDER_REGISTRY))
+        raise ValueError(f"Unknown provider: {provider}. Available providers: {available}")
 
     resolved_model = model or entry["default_model"]
     kwargs = _build_provider_kwargs(provider, resolved_model, temperature, api_key)

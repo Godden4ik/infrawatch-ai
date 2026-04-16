@@ -1,17 +1,29 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { motion } from "motion/react";
-import { useQuery } from "@tanstack/react-query";
+import { useQueries } from "@tanstack/react-query";
+import { Activity, Clock3 } from "lucide-react";
 import { metricsRangeQueryOptions } from "@/services/metrics/query-options";
-import type { PrometheusResult } from "@/services/metrics/schema";
+import type { MetricPoint } from "@/services/metrics/schema";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { MetricChart } from "./metric-chart";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Activity } from "lucide-react";
 
 type ServiceConfig = {
   latency: string;
   requestRate: string;
   errorRate: string;
+};
+
+type MetricDefinition = {
+  key: "latency" | "requestRate" | "errorRate";
+  title: string;
+  query: string;
+  color: string;
+  areaColor: string;
+  formatValue: (value: number) => string;
 };
 
 const SERVICE_METRICS: Record<string, ServiceConfig> = {
@@ -46,82 +58,210 @@ const CHART_LABELS: Record<string, { latency: string; requestRate: string; error
   "redis-cache": { latency: "Hit Ratio", requestRate: "Hits/s", errorRate: "Misses/s" },
 };
 
-function toChartData(result: PrometheusResult | undefined) {
-  if (!result?.data?.result?.[0]?.values) return [];
-  return result.data.result[0].values.map(([ts, val]) => ({
-    time: new Date(ts * 1000).toISOString(),
-    value: parseFloat(val),
-  }));
+function isMetricSeries(data: unknown): data is MetricPoint[] {
+  return (
+    Array.isArray(data) &&
+    data.every(
+      (point) =>
+        !!point &&
+        typeof point === "object" &&
+        typeof point.time === "string" &&
+        typeof point.value === "number" &&
+        Number.isFinite(point.value),
+    )
+  );
 }
 
 function useTimeRange() {
-  const end = Math.floor(Date.now() / 1000);
+  const [end, setEnd] = useState(() => Math.floor(Date.now() / 1000));
+
+  useEffect(() => {
+    const intervalId = window.setInterval(() => {
+      setEnd(Math.floor(Date.now() / 1000));
+    }, 60_000);
+
+    return () => window.clearInterval(intervalId);
+  }, []);
+
   const start = end - 3600;
   return { start: String(start), end: String(end), step: "60" };
 }
 
-export function ServiceMetrics({ serviceName }: { serviceName: string }) {
-  const { start, end, step } = useTimeRange();
-  const config = SERVICE_METRICS[serviceName];
+function formatLatency(value: number) {
+  if (value >= 1) return `${value.toFixed(2)}s`;
+  if (value >= 0.1) return `${(value * 1000).toFixed(0)}ms`;
+  return `${(value * 1000).toFixed(1)}ms`;
+}
 
-  const latency = useQuery(
-    metricsRangeQueryOptions(config?.latency ?? "", start, end, step),
-  );
-  const requestRate = useQuery(
-    metricsRangeQueryOptions(config?.requestRate ?? "", start, end, step),
-  );
-  const errorRate = useQuery(
-    metricsRangeQueryOptions(config?.errorRate ?? "", start, end, step),
-  );
+function formatPerSecond(value: number) {
+  if (value >= 100) return `${value.toFixed(0)}/s`;
+  if (value >= 10) return `${value.toFixed(1)}/s`;
+  return `${value.toFixed(3)}/s`;
+}
 
-  const isLoading = latency.isLoading || requestRate.isLoading || errorRate.isLoading;
+function formatRatio(value: number) {
+  return `${(value * 100).toFixed(1)}%`;
+}
 
-  if (!config) return null;
+const GREEN_METRIC_COLOR = "#4ade80";
+const GREEN_METRIC_AREA = "rgba(74, 222, 128, 0.18)";
 
-  if (isLoading) {
-    return (
-      <div className="space-y-3">
-        <div className="flex items-center gap-2">
-          <Activity className="text-muted-foreground h-4 w-4" />
-          <h3 className="font-mono text-sm font-medium">{serviceName}</h3>
-        </div>
-        <div className="grid gap-3 md:grid-cols-3">
-          {[1, 2, 3].map((i) => (
-            <Skeleton key={i} className="h-52 rounded-xl" />
-          ))}
-        </div>
-      </div>
-    );
-  }
-
+function getMetricDefinitions(serviceName: string, config: ServiceConfig): MetricDefinition[] {
   const labels = CHART_LABELS[serviceName] ?? {
     latency: "P95 Latency",
     requestRate: "Request Rate",
     errorRate: "Error Rate",
   };
 
+  if (serviceName === "redis-cache") {
+    return [
+      {
+        key: "latency",
+        title: labels.latency,
+        query: config.latency,
+        color: GREEN_METRIC_COLOR,
+        areaColor: GREEN_METRIC_AREA,
+        formatValue: formatRatio,
+      },
+      {
+        key: "requestRate",
+        title: labels.requestRate,
+        query: config.requestRate,
+        color: GREEN_METRIC_COLOR,
+        areaColor: GREEN_METRIC_AREA,
+        formatValue: formatPerSecond,
+      },
+      {
+        key: "errorRate",
+        title: labels.errorRate,
+        query: config.errorRate,
+        color: GREEN_METRIC_COLOR,
+        areaColor: GREEN_METRIC_AREA,
+        formatValue: formatPerSecond,
+      },
+    ];
+  }
+
+  return [
+    {
+      key: "latency",
+      title: labels.latency,
+      query: config.latency,
+      color: GREEN_METRIC_COLOR,
+      areaColor: GREEN_METRIC_AREA,
+      formatValue: formatLatency,
+    },
+    {
+      key: "requestRate",
+      title: labels.requestRate,
+      query: config.requestRate,
+      color: GREEN_METRIC_COLOR,
+      areaColor: GREEN_METRIC_AREA,
+      formatValue: formatPerSecond,
+    },
+    {
+      key: "errorRate",
+      title: labels.errorRate,
+      query: config.errorRate,
+      color: GREEN_METRIC_COLOR,
+      areaColor: GREEN_METRIC_AREA,
+      formatValue: formatPerSecond,
+    },
+  ];
+}
+
+export function ServiceMetrics({ serviceName }: { serviceName: string }) {
+  const { start, end, step } = useTimeRange();
+  const config = SERVICE_METRICS[serviceName] ?? SERVICE_METRICS["api-gateway"];
+  const isKnownService = serviceName in SERVICE_METRICS;
+  const isWideService = serviceName === "redis-cache";
+
+  const metricDefinitions = getMetricDefinitions(serviceName, config);
+
+  const metrics = useQueries({
+    queries: metricDefinitions.map((metric) =>
+      metricsRangeQueryOptions(metric.query, start, end, step),
+    ),
+  });
+
+  if (!isKnownService) return null;
+
+  const isLoading = metrics.some((metric) => metric.isPending);
+  const hasError = metrics.some((metric) => metric.isError);
+
+  if (isLoading) {
+    return (
+      <Card className="h-full" size="sm">
+        <CardHeader className="border-b border-border/60">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <Activity className="h-4 w-4 text-primary" />
+              <CardTitle className="font-mono text-sm">{serviceName}</CardTitle>
+            </div>
+            <Badge variant="outline" className="font-mono text-[11px]">
+              Loading
+            </Badge>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-2 pt-3">
+          {[1, 2, 3].map((i) => (
+            <Skeleton key={i} className="h-34" />
+          ))}
+        </CardContent>
+      </Card>
+    );
+  }
+
   return (
-    <div className="space-y-3">
-      <div className="flex items-center gap-2">
-        <Activity className="h-4 w-4 text-primary" />
-        <h3 className="font-mono text-sm font-medium">{serviceName}</h3>
-      </div>
-      <div className="grid gap-3 md:grid-cols-3">
-        {[
-          { title: labels.latency, data: toChartData(latency.data), unit: serviceName === "redis-cache" ? "" : "s", color: "#3b82f6" },
-          { title: labels.requestRate, data: toChartData(requestRate.data), unit: "/s", color: "#22c55e" },
-          { title: labels.errorRate, data: toChartData(errorRate.data), unit: "/s", color: "#ef4444" },
-        ].map((chart, i) => (
-          <motion.div
-            key={chart.title}
-            initial={{ opacity: 0, scale: 0.97 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ duration: 0.3, delay: i * 0.06 }}
+    <Card className="h-full" size="sm">
+      <CardHeader className="border-b border-border/60">
+        <div className="flex items-start justify-between gap-3">
+          <div className="space-y-1">
+            <div className="flex items-center gap-2">
+              <Activity className="h-4 w-4 text-primary" />
+              <CardTitle className="font-mono text-sm">{serviceName}</CardTitle>
+            </div>
+            <div className="flex items-center gap-2 font-mono text-[11px] text-muted-foreground">
+              <Clock3 className="h-3.5 w-3.5" />
+              <span>Last 60m</span>
+              <span className="text-muted-foreground/50">·</span>
+              <span>1m resolution</span>
+            </div>
+          </div>
+          <Badge
+            variant="outline"
+            className="border-primary/20 bg-primary/10 font-mono text-[11px] text-primary"
           >
-            <MetricChart {...chart} />
-          </motion.div>
-        ))}
-      </div>
-    </div>
+            Live
+          </Badge>
+        </div>
+      </CardHeader>
+      <CardContent
+        className={isWideService ? "grid gap-2 pt-3 lg:grid-cols-3" : "space-y-2 pt-3"}
+      >
+        {hasError ? (
+          <div className="border-border bg-background/50 px-3 py-4 font-mono text-xs text-muted-foreground ring-1 ring-inset ring-border/70">
+            Metric stream unavailable.
+          </div>
+        ) : (
+          metricDefinitions.map((metric, index) => (
+            <motion.div
+              key={metric.key}
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.25, delay: index * 0.04 }}
+            >
+              <MetricChart
+                title={metric.title}
+                data={isMetricSeries(metrics[index]?.data) ? metrics[index].data : []}
+                color={metric.color}
+                areaColor={metric.areaColor}
+                formatValue={metric.formatValue}
+              />
+            </motion.div>
+          ))
+        )}
+      </CardContent>
+    </Card>
   );
 }

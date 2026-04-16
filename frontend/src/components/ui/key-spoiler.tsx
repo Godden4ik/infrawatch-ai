@@ -1,156 +1,138 @@
 "use client";
 
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ParticleManager } from "@/lib/particle-manager";
 import { cn } from "@/lib/utils";
 
+const REVEAL_MS = 800;
+
 interface KeySpoilerProps {
   children: React.ReactNode;
-  /** Controlled reveal state. When false the particle overlay is shown. */
   revealed?: boolean;
-  /** Called when the user clicks to toggle reveal (uncontrolled usage). */
   onReveal?: () => void;
   className?: string;
 }
 
-/**
- * Wraps a masked API key string in a Telegram-style particle noise overlay.
- * Clicking reveals (or re-hides) the key.
- *
- * Usage (uncontrolled):
- *   <KeySpoiler>sk-a1b2...z9y0</KeySpoiler>
- *
- * Usage (controlled):
- *   <KeySpoiler revealed={isRevealed} onReveal={() => setRevealed(v => !v)}>
- *     sk-a1b2...z9y0
- *   </KeySpoiler>
- */
-export function KeySpoiler({ children, revealed: revealedProp, onReveal, className }: KeySpoilerProps) {
-  const [internalRevealed, setInternalRevealed] = useState(false);
+export function KeySpoiler({
+  children,
+  revealed: revealedProp,
+  onReveal,
+  className,
+}: KeySpoilerProps) {
   const isControlled = revealedProp !== undefined;
-  const revealed = isControlled ? revealedProp : internalRevealed;
+  const [revealedState, setRevealedState] = useState(false);
+  const revealed = isControlled ? revealedProp : revealedState;
+  const [animating, setAnimating] = useState(false);
 
   const containerRef = useRef<HTMLSpanElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const managerRef = useRef<ParticleManager | null>(null);
   const rafRef = useRef<number | null>(null);
-  const colorRef = useRef<string>("#888888");
 
-  // Resolve --muted-foreground CSS variable to a concrete colour for the canvas
-  const resolveColor = useCallback(() => {
-    if (typeof window === "undefined") return;
-    const style = getComputedStyle(document.documentElement);
-    // CSS var returns something like "oklch(0.705 0.015 286.067)" — canvas needs hex/rgb.
-    // We sample it via an offscreen element painted with that colour.
-    const tmp = document.createElement("canvas");
-    tmp.width = 1; tmp.height = 1;
-    const ctx = tmp.getContext("2d");
-    if (!ctx) return;
-    // Use a known safe fallback colour close to muted-foreground in dark mode
-    const raw = style.getPropertyValue("--muted-foreground").trim();
-    // If it's an oklch value, approximate with a grey that matches the dark-mode muted tone
-    if (raw.startsWith("oklch")) {
-      colorRef.current = "rgba(140,140,160,1)";
-    } else {
-      colorRef.current = raw || "rgba(140,140,160,1)";
-    }
-  }, []);
-
-  const startAnimation = useCallback(() => {
+  // Start particles once on mount, keep running until unmount
+  useEffect(() => {
     const canvas = canvasRef.current;
     const container = containerRef.current;
     if (!canvas || !container) return;
 
-    resolveColor();
+    const rect = container.getBoundingClientRect();
+    const dpr = window.devicePixelRatio || 1;
+    const w = rect.width;
+    const h = rect.height;
 
-    const w = container.offsetWidth;
-    const h = container.offsetHeight;
-    if (w === 0 || h === 0) return;
-
-    canvas.width = w;
-    canvas.height = h;
-
-    managerRef.current = new ParticleManager(w, h, {
-      density: 12,         // higher than Telegram default — keys are short
-      minVelocity: 0.15,
-      maxVelocity: 0.45,
-      particleLifetime: 55, // faster lifecycle
-      scale: 0.9,          // smaller particles
-      textColor: colorRef.current,
-    });
+    canvas.width = w * dpr;
+    canvas.height = h * dpr;
+    canvas.style.width = `${w}px`;
+    canvas.style.height = `${h}px`;
 
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
+    ctx.scale(dpr, dpr);
 
-    const tick = () => {
-      ctx.clearRect(0, 0, w, h);
-      managerRef.current?.update();
-      managerRef.current?.draw(ctx);
-      rafRef.current = requestAnimationFrame(tick);
+    // Resolve particle color from computed style
+    const computedColor = getComputedStyle(container).color || "rgba(140,140,160,1)";
+
+    managerRef.current = new ParticleManager(w, h, {
+      density: 12,
+      minVelocity: 0.15,
+      maxVelocity: 0.45,
+      particleLifetime: 55,
+      scale: 0.9,
+      textColor: computedColor,
+    });
+
+    function loop() {
+      if (!managerRef.current) return;
+      ctx!.clearRect(0, 0, w, h);
+      managerRef.current.update();
+      managerRef.current.draw(ctx!);
+      rafRef.current = requestAnimationFrame(loop);
+    }
+    rafRef.current = requestAnimationFrame(loop);
+
+    return () => {
+      if (rafRef.current !== null) {
+        cancelAnimationFrame(rafRef.current);
+        rafRef.current = null;
+      }
+      managerRef.current?.clear();
+      managerRef.current = null;
     };
-    rafRef.current = requestAnimationFrame(tick);
-  }, [resolveColor]);
-
-  const stopAnimation = useCallback(() => {
-    if (rafRef.current !== null) {
-      cancelAnimationFrame(rafRef.current);
-      rafRef.current = null;
-    }
-    managerRef.current?.clear();
-    managerRef.current = null;
-    const canvas = canvasRef.current;
-    if (canvas) {
-      const ctx = canvas.getContext("2d");
-      ctx?.clearRect(0, 0, canvas.width, canvas.height);
-    }
   }, []);
 
-  useEffect(() => {
-    if (revealed) {
-      stopAnimation();
-    } else {
-      startAnimation();
-    }
-    return () => stopAnimation();
-  }, [revealed, startAnimation, stopAnimation]);
-
-  const handleClick = () => {
+  function handleClick() {
     if (isControlled) {
+      setAnimating(true);
       onReveal?.();
     } else {
-      setInternalRevealed((v) => !v);
+      setAnimating(true);
+      setRevealedState((v) => !v);
     }
-  };
+  }
+
+  const duration = `${REVEAL_MS}ms`;
 
   return (
     <span
       ref={containerRef}
+      data-revealed={revealed || undefined}
       onClick={handleClick}
       title={revealed ? "Click to hide" : "Click to reveal"}
       className={cn(
-        "relative inline-flex cursor-pointer select-none items-center rounded-sm",
+        "relative flex w-full min-w-0 cursor-pointer select-none items-center",
+        revealed ? "text-foreground" : "text-muted-foreground",
         className,
       )}
     >
-      {/* Actual key text — always rendered for layout, opacity controls visibility */}
+      {/* Text — transparent when hidden, clip-path reveals from center */}
       <span
         className={cn(
-          "font-mono text-xs transition-opacity duration-200",
-          revealed ? "opacity-100 text-foreground" : "opacity-30 text-muted-foreground",
+          "block min-w-0 flex-1 font-mono text-xs",
+          revealed
+            ? "overflow-x-auto whitespace-nowrap text-left [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
+            : "overflow-hidden text-ellipsis whitespace-nowrap",
         )}
+        style={{
+          color: revealed ? undefined : "transparent",
+          clipPath: revealed ? "inset(0 0)" : "inset(0 50%)",
+          transition: animating
+            ? `color ${duration} ease-out, clip-path ${duration} cubic-bezier(0.25, 1, 0.5, 1)`
+            : "none",
+        }}
+        onTransitionEnd={() => setAnimating(false)}
       >
         {children}
       </span>
 
-      {/* Particle canvas overlay — only visible when not revealed */}
+      {/* Particle canvas — fades out on reveal */}
       <canvas
         ref={canvasRef}
         aria-hidden
-        className={cn(
-          "pointer-events-none absolute inset-0 transition-opacity duration-200",
-          revealed ? "opacity-0" : "opacity-100",
-        )}
-        style={{ display: "block" }}
+        className="pointer-events-none absolute inset-0"
+        style={{
+          opacity: revealed ? 0 : 1,
+          transition: animating ? `opacity ${duration} ease-out` : "none",
+        }}
       />
     </span>
   );

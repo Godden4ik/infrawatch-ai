@@ -24,6 +24,10 @@ export const streamEventSchema = z.discriminatedUnion("type", [
   z.object({
     type: z.literal("done"),
   }),
+  z.object({
+    type: z.literal("error"),
+    message: z.string(),
+  }),
 ]);
 
 export type StreamEvent = z.infer<typeof streamEventSchema>;
@@ -42,7 +46,20 @@ export type PipelineState = {
 };
 
 export const AGENT_ORDER = [
-  "monitor",
-  "analyst",
-  "responder",
+  "monitor_node",
+  "analyst_node",
+  "responder_node",
 ] as const;
+
+export const AGENT_ALIASES = {
+  monitor: "monitor_node",
+  analyst: "analyst_node",
+  responder: "responder_node",
+  monitor_node: "monitor_node",
+  analyst_node: "analyst_node",
+  responder_node: "responder_node",
+} as const;
+
+export function normalizeAgentName(agent: string) {
+  return AGENT_ALIASES[agent as keyof typeof AGENT_ALIASES] ?? agent;
+}
