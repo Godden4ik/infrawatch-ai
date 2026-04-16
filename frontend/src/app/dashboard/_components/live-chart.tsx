@@ -16,12 +16,20 @@ interface LiveChartProps {
   format: MetricFormat;
 }
 
+/** Resolve CSS variable to hex — oklch values don't work as SVG attributes */
 function resolveColor(colorVar: string): string {
   if (typeof window === "undefined") return "#6366f1";
-  const raw = getComputedStyle(document.documentElement)
-    .getPropertyValue(colorVar)
-    .trim();
-  return raw || "#6366f1";
+  const el = document.createElement("div");
+  el.style.color = `var(${colorVar})`;
+  document.body.appendChild(el);
+  const computed = getComputedStyle(el).color;
+  document.body.removeChild(el);
+  if (!computed || computed === "") return "#6366f1";
+  // computed is rgb(r, g, b) — convert to hex
+  const match = computed.match(/(\d+)/g);
+  if (!match || match.length < 3) return "#6366f1";
+  const hex = match.slice(0, 3).map((v) => Number(v).toString(16).padStart(2, "0")).join("");
+  return `#${hex}`;
 }
 
 export function LiveChart({ label, points, colorVar, format }: LiveChartProps) {
