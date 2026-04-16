@@ -28,6 +28,7 @@ export function LiveChart({ label, points, colorVar, format }: LiveChartProps) {
   const { resolvedTheme } = useTheme();
   const isDark = resolvedTheme === "dark";
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- isDark triggers re-read of CSS variable
   const color = useMemo(() => resolveColor(colorVar), [colorVar, isDark]);
 
   const currentValue = points.length > 0 ? points[points.length - 1].value : null;

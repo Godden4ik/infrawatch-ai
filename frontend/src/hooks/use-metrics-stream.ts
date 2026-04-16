@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useSyncExternalStore } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 
 export interface StreamPoint {
   time: string;
@@ -68,11 +68,7 @@ function createMetricsStore() {
 }
 
 export function useMetricsStream() {
-  const storeRef = useRef<ReturnType<typeof createMetricsStore>>();
-  if (!storeRef.current) {
-    storeRef.current = createMetricsStore();
-  }
-  const store = storeRef.current;
+  const [store] = useState(createMetricsStore);
 
   useEffect(() => {
     const es = new EventSource("/api/metrics/stream");
