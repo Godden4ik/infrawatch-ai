@@ -15,11 +15,11 @@ import json
 import os
 import re
 
-import anthropic
 from dotenv import load_dotenv
 
 load_dotenv()
 
+from agents.providers import get_llm
 from graph.retrieval import graphrag_retrieve, naive_rag_retrieve
 
 # ── Evaluation queries ───────────────────────────────────────────────
@@ -233,11 +233,12 @@ async def _llm_judge(
     query: str,
     content: str,
     provider: str = "anthropic",
-    ollama_model: str = "llama3.1",
+    model: str | None = None,
+    api_key: str | None = None,
 ) -> dict:
     """Score retrieved content on content relevance and actionability using an LLM judge.
 
-    provider: "anthropic" uses Claude Haiku; "ollama" calls a local Ollama instance.
+    Uses get_llm() from the provider registry — supports any registered provider.
     Returns dict with keys: content_relevance (1-10), actionability (1-10).
     Falls back to neutral scores on any error.
     """
@@ -245,34 +246,9 @@ async def _llm_judge(
     prompt = _build_judge_prompt(query, content)
 
     try:
-        if provider == "ollama":
-            import urllib.request as _urllib_req
-            payload = json.dumps({
-                "model": ollama_model,
-                "messages": [{"role": "user", "content": prompt}],
-                "stream": False,
-            }).encode()
-            req = _urllib_req.Request(
-                "http://localhost:11434/api/chat",
-                data=payload,
-                headers={"Content-Type": "application/json"},
-            )
-            # Run blocking urllib call off the event loop to avoid blocking it
-            import asyncio as _asyncio
-            def _call():
-                resp = _urllib_req.urlopen(req, timeout=120)
-                return json.loads(resp.read().decode())
-            data = await _asyncio.to_thread(_call)
-            text = data["message"]["content"]
-        else:
-            client = anthropic.AsyncAnthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
-            response = await client.messages.create(
-                model="claude-haiku-4-5-20251001",
-                max_tokens=64,
-                messages=[{"role": "user", "content": prompt}],
-            )
-            text = response.content[0].text
-
+        llm = get_llm(provider=provider, model=model, api_key=api_key, temperature=0.0)
+        response = await llm.ainvoke(prompt)
+        text = response.content if isinstance(response.content, str) else str(response.content)
         print(f"[llm_judge] raw response: {text!r}")
         return _parse_judge_response(text)
     except Exception as e:
@@ -283,10 +259,15 @@ async def _llm_judge(
 # ── Main ─────────────────────────────────────────────────────────────
 
 
-async def evaluate_single(query_info: dict, judge_provider: str = "anthropic", ollama_model: str = "llama3.1") -> dict:
+async def evaluate_single(
+    query_info: dict,
+    judge_provider: str = "anthropic",
+    judge_model: str | None = None,
+    judge_api_key: str | None = None,
+) -> dict:
     """Run a single query through both retrieval modes and score.
 
-    judge_provider: "anthropic" or "ollama" — controls which LLM grades the results.
+    judge_provider: provider id from PROVIDER_REGISTRY — controls which LLM grades the results.
     """
     service_ctx = query_info["expected_services"][0] if query_info["expected_services"] else None
 
@@ -304,8 +285,8 @@ async def evaluate_single(query_info: dict, judge_provider: str = "anthropic", o
     # Run both judge calls concurrently
     print(f"[evaluate_single] calling llm_judge ({judge_provider}) for: {query_info['query'][:50]}")
     gr_judge, nr_judge = await asyncio.gather(
-        _llm_judge(query_info["query"], gr_fmt, provider=judge_provider, ollama_model=ollama_model),
-        _llm_judge(query_info["query"], nr_fmt, provider=judge_provider, ollama_model=ollama_model),
+        _llm_judge(query_info["query"], gr_fmt, provider=judge_provider, model=judge_model, api_key=judge_api_key),
+        _llm_judge(query_info["query"], nr_fmt, provider=judge_provider, model=judge_model, api_key=judge_api_key),
     )
     print(f"[evaluate_single] judge results: gr={gr_judge} nr={nr_judge}")
     scores["graphrag"]["llm_content_relevance"] = gr_judge["content_relevance"]
@@ -319,14 +300,20 @@ async def evaluate_single(query_info: dict, judge_provider: str = "anthropic", o
 async def evaluate_all(
     queries: list[dict] | None = None,
     judge_provider: str = "anthropic",
-    ollama_model: str = "llama3.1",
+    judge_model: str | None = None,
+    judge_api_key: str | None = None,
 ) -> list[dict]:
     """Run all evaluation queries."""
     queries = queries or EVAL_QUERIES
     results = []
     for i, q in enumerate(queries):
         print(f"  [{i+1}/{len(queries)}] {q['query'][:60]}...")
-        result = await evaluate_single(q, judge_provider=judge_provider, ollama_model=ollama_model)
+        result = await evaluate_single(
+            q,
+            judge_provider=judge_provider,
+            judge_model=judge_model,
+            judge_api_key=judge_api_key,
+        )
         results.append(result)
     return results
 
@@ -371,14 +358,13 @@ def main():
     parser.add_argument("--query", type=int, help="Run a single query (1-indexed)")
     parser.add_argument(
         "--provider",
-        choices=["anthropic", "ollama"],
         default="anthropic",
-        help="LLM judge provider (default: anthropic)",
+        help="LLM judge provider id from the provider registry (default: anthropic)",
     )
     parser.add_argument(
-        "--ollama-model",
-        default="llama3.1",
-        help="Ollama model name when --provider=ollama (default: llama3.1)",
+        "--model",
+        default=None,
+        help="Model name for the judge provider (default: provider's default model)",
     )
     args = parser.parse_args()
 
@@ -391,9 +377,9 @@ def main():
     else:
         queries = EVAL_QUERIES
 
-    print(f"Running evaluation... (judge: {args.provider}" +
-          (f", model: {args.ollama_model}" if args.provider == "ollama" else "") + ")")
-    results = asyncio.run(evaluate_all(queries, judge_provider=args.provider, ollama_model=args.ollama_model))
+    model_info = f", model: {args.model}" if args.model else ""
+    print(f"Running evaluation... (judge: {args.provider}{model_info})")
+    results = asyncio.run(evaluate_all(queries, judge_provider=args.provider, judge_model=args.model))
 
     if args.json:
         # Remove formatted text for cleaner JSON
