@@ -20,10 +20,34 @@ function ResultItem({
   index: number;
   hasGraphContext?: boolean;
 }) {
-  const title = (item.title as string) ?? `Result ${index + 1}`;
+  // Runbooks use runbook_title + step_title + content (string)
+  // Incidents use title + resolution + root_cause
+  const title =
+    (item.runbook_title as string) ??
+    (item.title as string) ??
+    `Result ${index + 1}`;
+  const subtitle = item.step_title as string | undefined;
   const severity = item.severity as string | undefined;
-  const steps = item.steps as string[] | undefined;
+  const content = item.content as string | undefined;
   const graphContext = item.graph_context as Record<string, unknown> | undefined;
+
+  // GraphRAG topology fields for runbooks
+  const appliesToServices = item.applies_to_services as string[] | undefined;
+  const referencedServices = item.referenced_services as string[] | undefined;
+  const downstreamDeps = item.downstream_dependencies as string[] | undefined;
+  // GraphRAG topology fields for incidents
+  const affectedServices = item.affected_services as string[] | undefined;
+  const rootCauseServices = item.root_cause_services as string[] | undefined;
+  const symptoms = item.symptoms as string[] | undefined;
+
+  const hasTopology =
+    hasGraphContext &&
+    (appliesToServices?.length ||
+      referencedServices?.length ||
+      downstreamDeps?.length ||
+      affectedServices?.length ||
+      rootCauseServices?.length ||
+      symptoms?.length);
 
   return (
     <motion.div
@@ -33,7 +57,12 @@ function ResultItem({
       className="bg-secondary/30 rounded-xl p-4"
     >
       <div className="mb-2 flex items-start justify-between gap-3">
-        <h4 className="text-sm font-medium leading-snug">{title}</h4>
+        <div>
+          <h4 className="text-sm font-medium leading-snug">{title}</h4>
+          {subtitle && (
+            <p className="text-muted-foreground mt-0.5 text-xs">{subtitle}</p>
+          )}
+        </div>
         {severity && (
           <Badge
             variant="secondary"
@@ -50,19 +79,21 @@ function ResultItem({
         )}
       </div>
 
-      {steps && steps.length > 0 && (
-        <ol className="text-muted-foreground mt-2 space-y-1 pl-4 text-xs">
-          {steps.map((step, i) => (
-            <li key={i} className="list-decimal leading-relaxed">
-              {step}
-            </li>
-          ))}
-        </ol>
+      {content && (
+        <p className="text-muted-foreground mt-2 line-clamp-3 text-xs leading-relaxed">
+          {content}
+        </p>
       )}
 
       {typeof item.resolution === "string" && (
         <p className="text-muted-foreground mt-2 text-xs">
           Resolution: {item.resolution}
+        </p>
+      )}
+
+      {typeof item.root_cause === "string" && (
+        <p className="text-muted-foreground mt-1 text-xs">
+          Root cause: {item.root_cause}
         </p>
       )}
 
@@ -75,6 +106,46 @@ function ResultItem({
             >
               <Network className="h-3 w-3" />
               {key}: {JSON.stringify(val)}
+            </span>
+          ))}
+        </div>
+      )}
+
+      {hasTopology && (
+        <div className="mt-3 flex flex-wrap gap-2 border-t border-border/30 pt-3">
+          {appliesToServices?.map((s) => (
+            <span key={s} className="inline-flex items-center gap-1 rounded-md bg-blue-500/10 px-2 py-1 font-mono text-[11px] text-blue-400">
+              <Network className="h-3 w-3" />
+              applies: {s}
+            </span>
+          ))}
+          {referencedServices?.map((s) => (
+            <span key={s} className="inline-flex items-center gap-1 rounded-md bg-blue-500/10 px-2 py-1 font-mono text-[11px] text-blue-400">
+              <Network className="h-3 w-3" />
+              ref: {s}
+            </span>
+          ))}
+          {downstreamDeps?.map((s) => (
+            <span key={s} className="inline-flex items-center gap-1 rounded-md bg-blue-500/10 px-2 py-1 font-mono text-[11px] text-blue-400">
+              <Network className="h-3 w-3" />
+              downstream: {s}
+            </span>
+          ))}
+          {affectedServices?.map((s) => (
+            <span key={s} className="inline-flex items-center gap-1 rounded-md bg-blue-500/10 px-2 py-1 font-mono text-[11px] text-blue-400">
+              <Network className="h-3 w-3" />
+              affected: {s}
+            </span>
+          ))}
+          {rootCauseServices?.map((s) => (
+            <span key={s} className="inline-flex items-center gap-1 rounded-md bg-blue-500/10 px-2 py-1 font-mono text-[11px] text-blue-400">
+              <Network className="h-3 w-3" />
+              root cause: {s}
+            </span>
+          ))}
+          {symptoms?.map((s) => (
+            <span key={s} className="inline-flex items-center gap-1 rounded-md bg-purple-500/10 px-2 py-1 font-mono text-[11px] text-purple-400">
+              symptom: {s}
             </span>
           ))}
         </div>
