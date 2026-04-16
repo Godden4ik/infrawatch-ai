@@ -25,7 +25,7 @@ const PROVIDER_DISPLAY: Record<string, ProviderDisplay> = {
     color: "#FFFFFF",
     description: "GPT models",
   },
-  google: {
+  gemini: {
     icon: Gemini.Color,
     color: "#4285F4",
     description: "Gemini models",

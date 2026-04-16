@@ -85,7 +85,7 @@ def _make_ollama_mock():
 class TestProviderRegistry:
     def test_registry_has_all_four_providers(self):
 
-        assert set(PROVIDER_REGISTRY.keys()) >= {"anthropic", "openai", "google", "ollama"}
+        assert set(PROVIDER_REGISTRY.keys()) >= {"anthropic", "openai", "gemini", "ollama"}
 
     def test_each_entry_has_required_keys(self):
 
@@ -110,7 +110,7 @@ class TestProviderRegistry:
 
     def test_google_has_non_empty_models_list(self):
 
-        models = PROVIDER_REGISTRY["google"]["models"]
+        models = PROVIDER_REGISTRY["gemini"]["models"]
         assert isinstance(models, list) and len(models) > 0
 
 
@@ -134,7 +134,7 @@ class TestGetLlm:
     def test_returns_google(self):
         with patch.dict(sys.modules, {"langchain_google_genai": _make_google_mock()}):
 
-            llm = get_llm(provider="google")
+            llm = get_llm(provider="gemini")
             assert type(llm).__name__ == "ChatGoogleGenerativeAI"
 
     def test_returns_ollama(self):

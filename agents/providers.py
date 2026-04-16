@@ -14,6 +14,7 @@ PROVIDER_REGISTRY: dict[str, dict[str, Any]] = {
         "module": "langchain_anthropic",
         "class": "ChatAnthropic",
         "key_env": "ANTHROPIC_API_KEY",
+        "key_kwarg": "api_key",
         "default_model": "claude-haiku-4-5-20251001",
         "models": [
             "claude-haiku-4-5-20251001",
@@ -28,6 +29,7 @@ PROVIDER_REGISTRY: dict[str, dict[str, Any]] = {
         "module": "langchain_openai",
         "class": "ChatOpenAI",
         "key_env": "OPENAI_API_KEY",
+        "key_kwarg": "openai_api_key",
         "default_model": "gpt-4o-mini",
         "models": [
             "gpt-4o-mini",
@@ -37,11 +39,12 @@ PROVIDER_REGISTRY: dict[str, dict[str, Any]] = {
             "o1",
         ],
     },
-    "google": {
+    "gemini": {
         "name": "Gemini",
         "module": "langchain_google_genai",
         "class": "ChatGoogleGenerativeAI",
         "key_env": "GOOGLE_API_KEY",
+        "key_kwarg": "google_api_key",
         "default_model": "gemini-2.0-flash",
         "models": [
             "gemini-2.0-flash",
@@ -54,6 +57,7 @@ PROVIDER_REGISTRY: dict[str, dict[str, Any]] = {
         "module": "langchain_ollama",
         "class": "ChatOllama",
         "key_env": None,
+        "key_kwarg": None,
         "default_model": "llama3.1",
         "models": "dynamic",
     },
@@ -79,21 +83,11 @@ def _build_provider_kwargs(
     }
 
     if provider == "ollama":
-        # Ollama uses base_url, not an api_key
         kwargs["base_url"] = os.getenv("OLLAMA_URL", "http://localhost:11434")
-    elif provider == "openai":
+    elif entry.get("key_kwarg"):
         resolved_key = api_key or (os.getenv(entry["key_env"]) if entry["key_env"] else None)
         if resolved_key is not None:
-            kwargs["openai_api_key"] = resolved_key
-    elif provider == "google":
-        resolved_key = api_key or (os.getenv(entry["key_env"]) if entry["key_env"] else None)
-        if resolved_key is not None:
-            kwargs["google_api_key"] = resolved_key
-    else:
-        # anthropic and any future provider using generic "api_key"
-        resolved_key = api_key or (os.getenv(entry["key_env"]) if entry["key_env"] else None)
-        if resolved_key is not None:
-            kwargs["api_key"] = resolved_key
+            kwargs[entry["key_kwarg"]] = resolved_key
 
     return kwargs
 
