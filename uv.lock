@@ -457,6 +457,74 @@ wheels = [
 ]
 
 [[package]]
+name = "infrawatch-ai"
+version = "0.1.0"
+source = { virtual = "." }
+dependencies = [
+    { name = "anthropic" },
+    { name = "fastapi" },
+    { name = "httpx" },
+    { name = "langchain-anthropic" },
+    { name = "langchain-mcp-adapters" },
+    { name = "langchain-ollama" },
+    { name = "langgraph" },
+    { name = "mcp", extra = ["cli"] },
+    { name = "neo4j" },
+    { name = "prometheus-client" },
+    { name = "python-dotenv" },
+    { name = "pyyaml" },
+    { name = "sentence-transformers" },
+    { name = "uvicorn" },
+]
+
+[package.optional-dependencies]
+test = [
+    { name = "httpx" },
+    { name = "pytest" },
+    { name = "pytest-asyncio" },
+]
+
+[package.dev-dependencies]
+dev = [
+    { name = "httpx" },
+    { name = "pyright" },
+    { name = "pytest" },
+    { name = "pytest-asyncio" },
+    { name = "ruff" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "anthropic" },
+    { name = "fastapi" },
+    { name = "httpx", specifier = ">=0.27" },
+    { name = "httpx", marker = "extra == 'test'", specifier = ">=0.27" },
+    { name = "langchain-anthropic", specifier = ">=0.3" },
+    { name = "langchain-mcp-adapters", specifier = ">=0.2" },
+    { name = "langchain-ollama", specifier = ">=0.3" },
+    { name = "langgraph", specifier = ">=1.0" },
+    { name = "mcp", extras = ["cli"] },
+    { name = "neo4j", specifier = ">=5.0" },
+    { name = "prometheus-client" },
+    { name = "pytest", marker = "extra == 'test'", specifier = ">=8.0" },
+    { name = "pytest-asyncio", marker = "extra == 'test'", specifier = ">=0.23" },
+    { name = "python-dotenv", specifier = ">=1.0" },
+    { name = "pyyaml", specifier = ">=6.0" },
+    { name = "sentence-transformers", specifier = ">=3.0" },
+    { name = "uvicorn" },
+]
+provides-extras = ["test"]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "httpx", specifier = ">=0.27" },
+    { name = "pyright", specifier = ">=1.1" },
+    { name = "pytest", specifier = ">=8.0" },
+    { name = "pytest-asyncio", specifier = ">=0.23" },
+    { name = "ruff", specifier = ">=0.12" },
+]
+
+[[package]]
 name = "iniconfig"
 version = "2.3.0"
 source = { registry = "https://pypi.org/simple" }
@@ -1939,74 +2007,6 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/83/d3/803453b36afefb7c2bb238361cd4ae6125a569b4db67cd9e79846ba2d68c/sympy-1.14.0.tar.gz", hash = "sha256:d3d3fe8df1e5a0b42f0e7bdf50541697dbe7d23746e894990c030e2b05e72517", size = 7793921, upload-time = "2025-04-27T18:05:01.611Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/a2/09/77d55d46fd61b4a135c444fc97158ef34a095e5681d0a6c10b75bf356191/sympy-1.14.0-py3-none-any.whl", hash = "sha256:e091cc3e99d2141a0ba2847328f5479b05d94a6635cb96148ccb3f34671bd8f5", size = 6299353, upload-time = "2025-04-27T18:04:59.103Z" },
-]
-
-[[package]]
-name = "teg"
-version = "0.1.0"
-source = { virtual = "." }
-dependencies = [
-    { name = "anthropic" },
-    { name = "fastapi" },
-    { name = "httpx" },
-    { name = "langchain-anthropic" },
-    { name = "langchain-mcp-adapters" },
-    { name = "langchain-ollama" },
-    { name = "langgraph" },
-    { name = "mcp", extra = ["cli"] },
-    { name = "neo4j" },
-    { name = "prometheus-client" },
-    { name = "python-dotenv" },
-    { name = "pyyaml" },
-    { name = "sentence-transformers" },
-    { name = "uvicorn" },
-]
-
-[package.optional-dependencies]
-test = [
-    { name = "httpx" },
-    { name = "pytest" },
-    { name = "pytest-asyncio" },
-]
-
-[package.dev-dependencies]
-dev = [
-    { name = "httpx" },
-    { name = "pyright" },
-    { name = "pytest" },
-    { name = "pytest-asyncio" },
-    { name = "ruff" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "anthropic" },
-    { name = "fastapi" },
-    { name = "httpx", specifier = ">=0.27" },
-    { name = "httpx", marker = "extra == 'test'", specifier = ">=0.27" },
-    { name = "langchain-anthropic", specifier = ">=0.3" },
-    { name = "langchain-mcp-adapters", specifier = ">=0.2" },
-    { name = "langchain-ollama", specifier = ">=0.3" },
-    { name = "langgraph", specifier = ">=1.0" },
-    { name = "mcp", extras = ["cli"] },
-    { name = "neo4j", specifier = ">=5.0" },
-    { name = "prometheus-client" },
-    { name = "pytest", marker = "extra == 'test'", specifier = ">=8.0" },
-    { name = "pytest-asyncio", marker = "extra == 'test'", specifier = ">=0.23" },
-    { name = "python-dotenv", specifier = ">=1.0" },
-    { name = "pyyaml", specifier = ">=6.0" },
-    { name = "sentence-transformers", specifier = ">=3.0" },
-    { name = "uvicorn" },
-]
-provides-extras = ["test"]
-
-[package.metadata.requires-dev]
-dev = [
-    { name = "httpx", specifier = ">=0.27" },
-    { name = "pyright", specifier = ">=1.1" },
-    { name = "pytest", specifier = ">=8.0" },
-    { name = "pytest-asyncio", specifier = ">=0.23" },
-    { name = "ruff", specifier = ">=0.12" },
 ]
 
 [[package]]
