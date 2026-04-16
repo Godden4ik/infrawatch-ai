@@ -1,4 +1,4 @@
-import { Geist, Geist_Mono } from "next/font/google"
+import { Geist, Geist_Mono, IBM_Plex_Sans, Merriweather } from "next/font/google"
 
 import "./globals.css"
 import { Providers } from "@/providers/providers"
@@ -7,10 +7,9 @@ import { AppSidebar } from "@/components/layout/app-sidebar"
 import { ToastProvider } from "@/components/ui/toast-provider"
 import { cn } from "@/lib/utils";
 
-const fontSans = Geist({
-  subsets: ["latin"],
-  variable: "--font-sans",
-})
+const merriweatherHeading = Merriweather({subsets:['latin'],variable:'--font-heading'});
+
+const ibmPlexSans = IBM_Plex_Sans({subsets:['latin'],variable:'--font-sans'})
 
 const fontMono = Geist_Mono({
   subsets: ["latin"],
@@ -26,7 +25,7 @@ export default function RootLayout({
     <html
       lang="en"
       suppressHydrationWarning
-      className={cn("antialiased", fontMono.variable, "font-sans", fontSans.variable)}
+      className={cn("antialiased", fontMono.variable, "font-sans", ibmPlexSans.variable, merriweatherHeading.variable)}
     >
       <body>
         <Providers>
