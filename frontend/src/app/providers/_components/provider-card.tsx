@@ -17,6 +17,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
+import { KeySpoiler } from "@/components/ui/key-spoiler";
 import { ChevronDown, ChevronUp, Loader2 } from "lucide-react";
 import type { Provider, HealthResponse } from "@/services/providers/schema";
 
@@ -108,6 +109,8 @@ export function ProviderCard({ provider, hasSqliteKey }: ProviderCardProps) {
   const [maskedKey, setMaskedKey] = useState<string | null | undefined>(
     undefined,
   );
+  const [keyRevealed, setKeyRevealed] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
   const [healthResult, setHealthResult] = useState<HealthResponse | null>(null);
   const [modelsExpanded, setModelsExpanded] = useState(false);
 
@@ -123,6 +126,8 @@ export function ProviderCard({ provider, hasSqliteKey }: ProviderCardProps) {
     },
     onSuccess: async () => {
       setKeyInput("");
+      setIsEditing(false);
+      setKeyRevealed(false);
       toast.success(`API key saved for ${provider.name}`);
       // Fetch the masked key to display
       const maskedResult = await getMasked(provider.id);
@@ -144,6 +149,8 @@ export function ProviderCard({ provider, hasSqliteKey }: ProviderCardProps) {
     onSuccess: () => {
       setMaskedKey(null);
       setHealthResult(null);
+      setIsEditing(false);
+      setKeyRevealed(false);
       toast.success(`API key removed for ${provider.name}`);
       queryClient.invalidateQueries({ queryKey: providerKeys.list() });
     },
@@ -234,49 +241,72 @@ export function ProviderCard({ provider, hasSqliteKey }: ProviderCardProps) {
               API Key
             </p>
 
-            {isConfigured ? (
-              <div className="flex items-center gap-2">
-                <code className="flex-1 font-mono text-xs text-muted-foreground bg-muted/40 px-2 py-1 min-w-0 truncate">
-                  {hasSqliteKey
-                    ? maskedKey === undefined
-                      ? "loading..."
-                      : (maskedKey ?? "sk-...????")
-                    : "Environment variable"}
-                </code>
-                {hasSqliteKey && (
+            {isConfigured && !isEditing ? (
+              /* ── Read mode: spoiler + action buttons ── */
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <div className="flex-1 min-w-0 bg-muted/40 px-2 py-1 rounded-sm">
+                    {hasSqliteKey ? (
+                      maskedKey === undefined ? (
+                        <span className="font-mono text-xs text-muted-foreground">loading...</span>
+                      ) : (
+                        <KeySpoiler
+                          revealed={keyRevealed}
+                          onReveal={() => setKeyRevealed((v) => !v)}
+                        >
+                          {maskedKey ?? "sk-...????"}
+                        </KeySpoiler>
+                      )
+                    ) : (
+                      <span className="font-mono text-xs text-muted-foreground">Environment variable</span>
+                    )}
+                  </div>
+                  {hasSqliteKey && (
+                    <>
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        disabled={isMutating}
+                        onClick={() => { setIsEditing(true); setKeyRevealed(false); }}
+                      >
+                        Edit
+                      </Button>
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        disabled={removeMutation.isPending}
+                        onClick={() => removeMutation.mutate()}
+                      >
+                        {removeMutation.isPending ? (
+                          <Loader2 className="h-3 w-3 animate-spin" />
+                        ) : (
+                          "Remove"
+                        )}
+                      </Button>
+                    </>
+                  )}
                   <Button
-                    variant="secondary"
+                    variant="outline"
                     size="sm"
-                    disabled={removeMutation.isPending}
-                    onClick={() => removeMutation.mutate()}
+                    disabled={isMutating}
+                    onClick={() => healthMutation.mutate()}
                   >
-                    {removeMutation.isPending ? (
+                    {healthMutation.isPending ? (
                       <Loader2 className="h-3 w-3 animate-spin" />
                     ) : (
-                      "Remove"
+                      "Test"
                     )}
                   </Button>
-                )}
-                <Button
-                  variant="outline"
-                  size="sm"
-                  disabled={isMutating}
-                  onClick={() => healthMutation.mutate()}
-                >
-                  {healthMutation.isPending ? (
-                    <Loader2 className="h-3 w-3 animate-spin" />
-                  ) : (
-                    "Test"
+                  {(healthMutation.isSuccess || healthMutation.isError) && (
+                    <HealthResult
+                      result={healthResult}
+                      isLoading={healthMutation.isPending}
+                    />
                   )}
-                </Button>
-                {(healthMutation.isSuccess || healthMutation.isError) && (
-                  <HealthResult
-                    result={healthResult}
-                    isLoading={healthMutation.isPending}
-                  />
-                )}
+                </div>
               </div>
             ) : (
+              /* ── Input mode: new key or edit ── */
               <div className="space-y-2">
                 <div className="flex items-center gap-2">
                   <Input
@@ -291,6 +321,7 @@ export function ProviderCard({ provider, hasSqliteKey }: ProviderCardProps) {
                     }}
                     className="flex-1"
                     disabled={saveMutation.isPending}
+                    autoFocus={isEditing}
                   />
                   <Button
                     size="sm"
@@ -303,14 +334,26 @@ export function ProviderCard({ provider, hasSqliteKey }: ProviderCardProps) {
                       "Save"
                     )}
                   </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    disabled={isMutating}
-                    onClick={() => healthMutation.mutate()}
-                  >
-                    Test
-                  </Button>
+                  {isEditing && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      disabled={saveMutation.isPending}
+                      onClick={() => { setIsEditing(false); setKeyInput(""); }}
+                    >
+                      Cancel
+                    </Button>
+                  )}
+                  {!isEditing && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={isMutating}
+                      onClick={() => healthMutation.mutate()}
+                    >
+                      Test
+                    </Button>
+                  )}
                 </div>
                 {(healthMutation.isSuccess || healthMutation.isError) && (
                   <HealthResult

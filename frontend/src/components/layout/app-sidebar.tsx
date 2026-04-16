@@ -58,7 +58,7 @@ export function AppSidebar() {
   }
 
   return (
-    <Sidebar variant="inset" className="border-r border-sidebar-border">
+    <Sidebar variant="inset" className="rounded-xl border border-sidebar-border/60 shadow-md">
       {/* Logo */}
       <SidebarHeader className="px-4 py-4">
         <div className="flex items-center gap-2.5">

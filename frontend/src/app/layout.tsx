@@ -6,7 +6,6 @@ import { SidebarProvider, SidebarInset, SidebarTrigger } from "@/components/ui/s
 import { AppSidebar } from "@/components/layout/app-sidebar"
 import { ToastProvider } from "@/components/ui/toast-provider"
 import { TooltipProvider } from "@/components/ui/tooltip"
-import { Separator } from "@/components/ui/separator"
 import { cn } from "@/lib/utils";
 import { Breadcrumbs } from "@/components/layout/breadcrumbs"
 
@@ -36,9 +35,8 @@ export default function RootLayout({
                 <AppSidebar />
                 <SidebarInset>
                   {/* Minimal header strip */}
-                  <header className="flex h-10 shrink-0 items-center gap-2 border-b border-border/40 px-4">
+                  <header className="flex h-10 shrink-0 items-center gap-2 px-6">
                     <SidebarTrigger className="-ml-1 h-7 w-7" />
-                    <Separator orientation="vertical" className="mr-1 h-4" />
                     <Breadcrumbs />
                   </header>
                   {/* Content area */}
