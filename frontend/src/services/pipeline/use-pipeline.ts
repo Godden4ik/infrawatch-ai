@@ -77,6 +77,7 @@ export function usePipelineStream() {
     mutationFn: async (params: {
       llmProvider?: string;
       llmModel?: string;
+      apiKey?: string;
     }) => {
       queryClient.setQueryData(pipelineKeys.currentRun(), INITIAL_STATE);
 
@@ -86,6 +87,7 @@ export function usePipelineStream() {
         body: JSON.stringify({
           llm_provider: params.llmProvider ?? "anthropic",
           llm_model: params.llmModel ?? null,
+          api_key: params.apiKey ?? null,
         }),
       });
 
