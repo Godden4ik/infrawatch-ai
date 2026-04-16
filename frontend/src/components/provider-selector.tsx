@@ -5,7 +5,10 @@ import { motion } from "motion/react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Lock, KeyRound, Loader2, Check, X } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { providerQueries, providerKeys } from "@/services/providers/query-options";
+import {
+  providerQueries,
+  providerKeys,
+} from "@/services/providers/query-options";
 import { getProviderDisplay } from "@/lib/provider-display";
 import { getStoredKey, storeKey, clearKey } from "@/lib/provider-keys";
 import { toast } from "@/hooks/use-toast";
@@ -21,7 +24,7 @@ import {
 } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import type { Provider, HealthResponse } from "@/services/providers/schema";
+import type { HealthResponse } from "@/services/providers/schema";
 
 export type ProviderSelection = {
   provider: string;
@@ -49,18 +52,15 @@ export function ProviderSelector({
   );
 
   const providers = providersData?.providers ?? [];
-  const activeProvider: Provider | undefined = providers.find(
-    (p) => p.id === value.provider,
-  );
+  const activeProvider = providers.find((p) => p.id === value.provider);
 
-  // Retrieve stored key for active provider
   const [storedKey, setStoredKey] = useState<string | null>(null);
   useEffect(() => {
     setStoredKey(getStoredKey(value.provider));
     setKeyInput("");
   }, [value.provider]);
 
-  // When provider changes or data loads: auto-pick default model if current model isn't in list
+  // Auto-pick default model when provider changes
   useEffect(() => {
     if (!activeProvider) return;
     const modelIds = activeProvider.models.map((m) => m.id);
@@ -68,9 +68,11 @@ export function ProviderSelector({
       !value.model ||
       (modelIds.length > 0 && !modelIds.includes(value.model))
     ) {
-      const defaultModel =
-        activeProvider.default_model || activeProvider.models[0]?.id || "";
-      onChange({ ...value, model: defaultModel });
+      onChange({
+        ...value,
+        model:
+          activeProvider.default_model || activeProvider.models[0]?.id || "",
+      });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeProvider?.id, value.provider]);
@@ -80,21 +82,17 @@ export function ProviderSelector({
     try {
       const headers: Record<string, string> = {};
       const resolvedKey = key ?? storedKey;
-      if (resolvedKey) {
-        headers["X-Provider-Key"] = resolvedKey;
-      }
+      if (resolvedKey) headers["X-Provider-Key"] = resolvedKey;
+
       const health = await apiClient<HealthResponse>(
         `/api/providers/${providerId}/health`,
         { headers },
       );
-      // Cache the result
       queryClient.setQueryData(providerKeys.health(providerId), health);
 
       if (health.status === "healthy") {
         toast.success(`${providerId} is healthy (${health.latency_ms}ms)`);
-      } else if (health.status === "no_key") {
-        // Expected state — no toast, just update the cached health dot
-      } else {
+      } else if (health.status !== "no_key") {
         toast.error(
           `${providerId} health check failed: ${health.error ?? health.status}`,
         );
@@ -109,15 +107,14 @@ export function ProviderSelector({
   }
 
   function handleProviderSelect(providerId: string) {
-    const newProvider = providers.find((p) => p.id === providerId);
-    const model = newProvider?.default_model ?? newProvider?.models[0]?.id ?? "";
+    const p = providers.find((p) => p.id === providerId);
     const key = getStoredKey(providerId);
     setStoredKey(key);
-    onChange({ provider: providerId, model, apiKey: key });
-  }
-
-  function handleModelChange(model: string | null) {
-    if (model) onChange({ ...value, model });
+    onChange({
+      provider: providerId,
+      model: p?.default_model ?? p?.models[0]?.id ?? "",
+      apiKey: key,
+    });
   }
 
   function handleSaveKey() {
@@ -126,7 +123,7 @@ export function ProviderSelector({
     setStoredKey(keyInput.trim());
     onChange({ ...value, apiKey: keyInput.trim() });
     setKeyInput("");
-    toast.success("API key saved to session storage");
+    toast.success("API key saved to session");
     runHealthCheck(value.provider, keyInput.trim());
   }
 
@@ -138,25 +135,24 @@ export function ProviderSelector({
   }
 
   const needsKey =
-    !!activeProvider?.requires_key &&
-    !activeProvider?.available &&
-    !storedKey;
+    !!activeProvider?.requires_key && !activeProvider?.available && !storedKey;
+  const hasModels = activeProvider && activeProvider.models.length > 0;
 
   return (
     <div className="space-y-3">
       {/* Label */}
-      <label className="text-muted-foreground mb-1.5 block text-xs font-medium uppercase tracking-wider">
+      <label className="text-muted-foreground block text-xs font-medium uppercase tracking-wider">
         {label}
       </label>
 
-      {/* Provider pills */}
+      {/* Provider pills — fixed 2x2 grid, no wrapping shift */}
       {providersLoading ? (
         <div className="flex items-center gap-2 py-2 text-sm text-muted-foreground">
           <Loader2 className="h-3.5 w-3.5 animate-spin" />
           Loading providers...
         </div>
       ) : (
-        <div className="bg-secondary/50 flex flex-wrap gap-1 rounded-lg p-1">
+        <div className="bg-secondary/50 grid grid-cols-2 gap-1 rounded-lg p-1">
           {providers.map((p) => {
             const display = getProviderDisplay(p.id);
             const Icon = display.icon;
@@ -164,16 +160,13 @@ export function ProviderSelector({
             const cachedHealth = queryClient.getQueryData<HealthResponse>(
               providerKeys.health(p.id),
             );
-            const isHealthy = cachedHealth?.status === "healthy";
-            const isUnhealthy =
-              cachedHealth && cachedHealth.status !== "healthy";
 
             return (
               <button
                 key={p.id}
                 onClick={() => handleProviderSelect(p.id)}
                 className={cn(
-                  "relative flex flex-1 items-center justify-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-colors",
+                  "relative flex items-center justify-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-colors",
                   !isActive && "text-muted-foreground hover:text-foreground",
                 )}
               >
@@ -181,28 +174,31 @@ export function ProviderSelector({
                   <motion.div
                     layoutId={`provider-pill-${label}`}
                     className="bg-primary/15 border-primary/20 absolute inset-0 rounded-md border"
-                    transition={{ type: "spring", bounce: 0.15, duration: 0.4 }}
+                    transition={{
+                      type: "spring",
+                      bounce: 0.15,
+                      duration: 0.4,
+                    }}
                   />
                 )}
                 <Icon
-                  className="relative z-10 h-3.5 w-3.5"
+                  className="relative z-10 h-3.5 w-3.5 shrink-0"
                   style={{ color: display.color }}
                 />
                 <span className="relative z-10">{p.name}</span>
-                {/* Lock icon if key is pre-configured (available=true with requires_key) */}
                 {p.requires_key && p.available && (
-                  <Lock className="relative z-10 h-3 w-3 text-muted-foreground" />
+                  <Lock className="relative z-10 h-3 w-3 shrink-0 text-muted-foreground" />
                 )}
-                {/* Health dot */}
-                {isHealthy && (
-                  <span className="relative z-10 h-1.5 w-1.5 rounded-full bg-green-500" />
+                {cachedHealth?.status === "healthy" && (
+                  <span className="relative z-10 h-1.5 w-1.5 shrink-0 rounded-full bg-green-500" />
                 )}
-                {isUnhealthy && (
-                  <span className="relative z-10 h-1.5 w-1.5 rounded-full bg-red-500" />
-                )}
-                {/* Health check spinner */}
+                {cachedHealth &&
+                  cachedHealth.status !== "healthy" &&
+                  cachedHealth.status !== "no_key" && (
+                    <span className="relative z-10 h-1.5 w-1.5 shrink-0 rounded-full bg-red-500" />
+                  )}
                 {isCheckingHealth && isActive && (
-                  <Loader2 className="relative z-10 h-3 w-3 animate-spin" />
+                  <Loader2 className="relative z-10 h-3 w-3 shrink-0 animate-spin" />
                 )}
               </button>
             );
@@ -210,26 +206,23 @@ export function ProviderSelector({
         </div>
       )}
 
-      {/* Model dropdown */}
-      {activeProvider && activeProvider.models.length > 0 && (
-        <motion.div
-          key={`model-select-${value.provider}`}
-          initial={{ opacity: 0, height: 0 }}
-          animate={{ opacity: 1, height: "auto" }}
-          exit={{ opacity: 0, height: 0 }}
-          className="space-y-1.5"
-        >
+      {/* Model dropdown — always rendered, no height animation */}
+      {hasModels && (
+        <div className="space-y-1.5">
           <label className="text-muted-foreground block text-xs font-medium uppercase tracking-wider">
             Model
           </label>
-          <Select value={value.model} onValueChange={handleModelChange}>
+          <Select
+            value={value.model}
+            onValueChange={(m) => m && onChange({ ...value, model: m })}
+          >
             <SelectTrigger className="w-full">
               <SelectValue placeholder="Select a model" />
             </SelectTrigger>
             <SelectContent>
               <SelectGroup>
-                <SelectLabel>{activeProvider.name} Models</SelectLabel>
-                {activeProvider.models.map((m) => (
+                <SelectLabel>{activeProvider!.name} Models</SelectLabel>
+                {activeProvider!.models.map((m) => (
                   <SelectItem key={m.id} value={m.id}>
                     <div className="flex w-full items-center justify-between gap-3">
                       <span className="font-mono text-sm">{m.name}</span>
@@ -244,64 +237,56 @@ export function ProviderSelector({
               </SelectGroup>
             </SelectContent>
           </Select>
-        </motion.div>
+        </div>
       )}
 
-      {/* API key input — shown when key is needed */}
-      {needsKey && (
-        <motion.div
-          initial={{ opacity: 0, height: 0 }}
-          animate={{ opacity: 1, height: "auto" }}
-          exit={{ opacity: 0, height: 0 }}
-          className="space-y-1.5"
-        >
-          <label className="text-muted-foreground block text-xs font-medium uppercase tracking-wider">
-            API Key
-          </label>
-          <div className="flex gap-2">
-            <div className="relative flex-1">
-              <KeyRound className="text-muted-foreground absolute top-1/2 left-3 h-3.5 w-3.5 -translate-y-1/2" />
-              <Input
-                type="password"
-                value={keyInput}
-                onChange={(e) => setKeyInput(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && handleSaveKey()}
-                placeholder="Paste your API key…"
-                className="pl-9"
-              />
+      {/* API key section — fixed height slot, content fades in/out */}
+      {activeProvider?.requires_key && !activeProvider?.available && (
+        <div className="space-y-1.5">
+          {needsKey ? (
+            <>
+              <label className="text-muted-foreground block text-xs font-medium uppercase tracking-wider">
+                API Key
+              </label>
+              <div className="flex gap-2">
+                <div className="relative flex-1">
+                  <KeyRound className="text-muted-foreground absolute top-1/2 left-3 h-3.5 w-3.5 -translate-y-1/2" />
+                  <Input
+                    type="password"
+                    value={keyInput}
+                    onChange={(e) => setKeyInput(e.target.value)}
+                    onKeyDown={(e) => e.key === "Enter" && handleSaveKey()}
+                    placeholder="Paste your API key…"
+                    className="pl-9"
+                  />
+                </div>
+                <Button
+                  size="sm"
+                  onClick={handleSaveKey}
+                  disabled={!keyInput.trim()}
+                  className="gap-1.5"
+                >
+                  <Check className="h-3.5 w-3.5" />
+                  Save
+                </Button>
+              </div>
+            </>
+          ) : (
+            <div className="bg-secondary/60 flex items-center justify-between rounded-lg px-3 py-2 text-xs">
+              <div className="flex items-center gap-2 text-muted-foreground">
+                <KeyRound className="h-3 w-3 text-green-500" />
+                <span>Session key active</span>
+              </div>
+              <button
+                onClick={handleClearKey}
+                className="text-muted-foreground hover:text-destructive flex items-center gap-1 transition-colors"
+              >
+                <X className="h-3 w-3" />
+                Clear
+              </button>
             </div>
-            <Button
-              size="sm"
-              onClick={handleSaveKey}
-              disabled={!keyInput.trim()}
-              className="gap-1.5"
-            >
-              <Check className="h-3.5 w-3.5" />
-              Save
-            </Button>
-          </div>
-        </motion.div>
-      )}
-
-      {/* Stored key indicator */}
-      {storedKey && (
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          className="bg-secondary/60 flex items-center justify-between rounded-lg px-3 py-2 text-xs"
-        >
-          <div className="flex items-center gap-2 text-muted-foreground">
-            <KeyRound className="h-3 w-3 text-green-500" />
-            <span>Session key active</span>
-          </div>
-          <button
-            onClick={handleClearKey}
-            className="text-muted-foreground hover:text-destructive flex items-center gap-1 transition-colors"
-          >
-            <X className="h-3 w-3" />
-            Clear
-          </button>
-        </motion.div>
+          )}
+        </div>
       )}
     </div>
   );
