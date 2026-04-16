@@ -3,168 +3,429 @@
 import { useQuery } from "@tanstack/react-query";
 import { motion } from "motion/react";
 import { healthQueryOptions } from "@/services/health/query-options";
+import { providerQueries } from "@/services/providers/query-options";
 import { StatusIndicator } from "@/components/layout/status-indicator";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Activity, Server, Shield, Database, Cpu } from "lucide-react";
+import {
+  Shield,
+  CreditCard,
+  User,
+  Package,
+  Server,
+  Activity,
+  CheckCircle2,
+  AlertTriangle,
+  XCircle,
+} from "lucide-react";
+import { SiRedis, SiPrometheus, SiNeo4J } from "react-icons/si";
+import type { ComponentType, SVGProps } from "react";
 
-const SERVICE_ICONS: Record<string, React.ElementType> = {
-  "api-gateway": Shield,
-  "payment-service": Cpu,
-  "user-service": Server,
-  "order-service": Database,
-  "redis-cache": Database,
-  prometheus: Activity,
-  neo4j: Database,
+// ─── Icon mapping ─────────────────────────────────────────────────────────────
+
+type LucideIconProps = {
+  className?: string;
+  size?: number | string;
 };
+type SiIconProps = SVGProps<SVGSVGElement> & { className?: string };
+
+const MICROSERVICE_ICONS: Record<
+  string,
+  ComponentType<LucideIconProps | SiIconProps>
+> = {
+  "api-gateway": Shield as ComponentType<LucideIconProps | SiIconProps>,
+  "payment-service": CreditCard as ComponentType<LucideIconProps | SiIconProps>,
+  "user-service": User as ComponentType<LucideIconProps | SiIconProps>,
+  "order-service": Package as ComponentType<LucideIconProps | SiIconProps>,
+  "redis-cache": SiRedis as ComponentType<LucideIconProps | SiIconProps>,
+};
+
+const INFRA_ICONS: Record<
+  string,
+  ComponentType<LucideIconProps | SiIconProps>
+> = {
+  prometheus: SiPrometheus as ComponentType<LucideIconProps | SiIconProps>,
+  neo4j: SiNeo4J as ComponentType<LucideIconProps | SiIconProps>,
+};
+
+const MICROSERVICES = [
+  "api-gateway",
+  "payment-service",
+  "user-service",
+  "order-service",
+  "redis-cache",
+];
+
+const INFRA_SERVICES = ["prometheus", "neo4j"];
+
+// ─── Status helpers ────────────────────────────────────────────────────────────
+
+type ServiceStatus = "healthy" | "unhealthy" | "unreachable";
+
+function statusColor(status: ServiceStatus) {
+  if (status === "healthy") return "text-emerald-500";
+  if (status === "unhealthy") return "text-amber-500";
+  return "text-destructive";
+}
+
+function statusDotClass(status: ServiceStatus) {
+  if (status === "healthy")
+    return "bg-emerald-500 shadow-[0_0_5px_rgba(34,197,94,0.6)]";
+  if (status === "unhealthy")
+    return "bg-amber-500 shadow-[0_0_5px_rgba(245,158,11,0.6)]";
+  return "bg-destructive shadow-[0_0_5px_rgba(239,68,68,0.5)]";
+}
+
+function overallStatusIcon(status: "healthy" | "degraded" | undefined) {
+  if (status === "healthy")
+    return <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />;
+  if (status === "degraded")
+    return <AlertTriangle className="h-3.5 w-3.5 text-amber-500" />;
+  return <XCircle className="h-3.5 w-3.5 text-muted-foreground" />;
+}
+
+// ─── Sub-components ────────────────────────────────────────────────────────────
+
+function StatCard({
+  label,
+  value,
+  sub,
+  accent,
+}: {
+  label: string;
+  value: React.ReactNode;
+  sub?: string;
+  accent?: "emerald" | "amber" | "muted";
+}) {
+  const valueClass =
+    accent === "emerald"
+      ? "text-emerald-500"
+      : accent === "amber"
+        ? "text-amber-500"
+        : "text-foreground";
+
+  return (
+    <Card className="p-0">
+      <CardContent className="p-3">
+        <p className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+          {label}
+        </p>
+        <p
+          className={`mt-1.5 font-mono text-2xl font-semibold tabular-nums leading-none ${valueClass}`}
+        >
+          {value}
+        </p>
+        {sub && (
+          <p className="mt-1 font-mono text-[10px] text-muted-foreground">
+            {sub}
+          </p>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+function ServiceCard({
+  name,
+  status,
+}: {
+  name: string;
+  status: ServiceStatus;
+}) {
+  const Icon =
+    MICROSERVICE_ICONS[name] ??
+    (Server as ComponentType<LucideIconProps | SiIconProps>);
+
+  return (
+    <Card className="p-0">
+      <CardContent className="p-3">
+        <div className="flex items-start justify-between gap-2">
+          <div className="flex items-center gap-2 min-w-0">
+            <Icon
+              className="h-3.5 w-3.5 shrink-0 text-muted-foreground"
+              size={14}
+            />
+            <span className="font-mono text-xs truncate">{name}</span>
+          </div>
+          <span
+            className={`mt-0.5 h-1.5 w-1.5 shrink-0 rounded-full ${statusDotClass(status)}`}
+          />
+        </div>
+        <p
+          className={`mt-2 font-mono text-[10px] uppercase tracking-wider ${statusColor(status)}`}
+        >
+          {status}
+        </p>
+      </CardContent>
+    </Card>
+  );
+}
+
+function InfraRow({
+  name,
+  status,
+}: {
+  name: string;
+  status: ServiceStatus | undefined;
+}) {
+  const Icon =
+    INFRA_ICONS[name] ??
+    (Activity as ComponentType<LucideIconProps | SiIconProps>);
+  const resolvedStatus: ServiceStatus = status ?? "unreachable";
+
+  return (
+    <div className="flex items-center gap-3 rounded-[var(--radius)] bg-muted/40 px-3 py-2">
+      <Icon
+        className="h-3.5 w-3.5 shrink-0 text-muted-foreground"
+        size={14}
+      />
+      <span className="font-mono text-xs flex-1">{name}</span>
+      <span
+        className={`h-1.5 w-1.5 shrink-0 rounded-full ${statusDotClass(resolvedStatus)}`}
+      />
+      <span
+        className={`font-mono text-[10px] uppercase tracking-wider ${statusColor(resolvedStatus)}`}
+      >
+        {resolvedStatus}
+      </span>
+    </div>
+  );
+}
+
+function StatCardSkeleton() {
+  return (
+    <Card className="p-0">
+      <CardContent className="p-3 space-y-2">
+        <Skeleton className="h-2.5 w-20" />
+        <Skeleton className="h-7 w-12" />
+        <Skeleton className="h-2 w-16" />
+      </CardContent>
+    </Card>
+  );
+}
+
+function ServiceCardSkeleton() {
+  return (
+    <Card className="p-0">
+      <CardContent className="p-3 space-y-2">
+        <div className="flex justify-between items-center">
+          <Skeleton className="h-3 w-24" />
+          <Skeleton className="h-1.5 w-1.5 rounded-full" />
+        </div>
+        <Skeleton className="h-2.5 w-14" />
+      </CardContent>
+    </Card>
+  );
+}
+
+// ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function HomePage() {
   const { data, isLoading, error } = useQuery(healthQueryOptions);
+  const { data: providersData, isLoading: isLoadingProviders } = useQuery(
+    providerQueries.list(),
+  );
 
   const healthyCount = data
     ? Object.values(data.services).filter((s) => s === "healthy").length
     : 0;
   const totalCount = data ? Object.keys(data.services).length : 0;
 
+  const microservices = data
+    ? MICROSERVICES.filter((s) => s in data.services)
+    : [];
+  const infraServices = data
+    ? INFRA_SERVICES.filter((s) => s in data.services)
+    : [];
+
+  const activeProviders = providersData
+    ? providersData.providers.filter((p) => p.available).length
+    : null;
+
+  const systemStatus = data?.status;
+  const statusAccent =
+    systemStatus === "healthy"
+      ? "emerald"
+      : systemStatus === "degraded"
+        ? "amber"
+        : "muted";
+
   return (
-    <div className="mx-auto max-w-6xl space-y-8">
-      {/* Header */}
-      <motion.div
-        className="space-y-1.5"
-        initial={{ opacity: 0, y: -8 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.3 }}
-      >
-        <h1 className="text-2xl font-semibold tracking-tight">
-          System Overview
-        </h1>
-        <p className="text-muted-foreground">
+    <motion.div
+      className="mx-auto max-w-6xl space-y-5"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 0.25 }}
+    >
+      {/* ── Page header ──────────────────────────────────────────────────── */}
+      <div>
+        <h1 className="text-base font-semibold">System Overview</h1>
+        <p className="text-xs text-muted-foreground">
           Real-time infrastructure health across all monitored services
         </p>
-      </motion.div>
+      </div>
 
-      {/* Status banner */}
-      <motion.div
-        initial={{ opacity: 0, y: 8 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.35, delay: 0.05 }}
-      >
-        <Card className="border-border/50 overflow-hidden">
-          <CardContent className="flex items-center gap-6 py-5">
-            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-primary/10">
-              <Activity className="h-6 w-6 text-primary" />
-            </div>
-            <div className="flex-1">
-              <div className="flex items-center gap-3">
-                <h2 className="text-lg font-semibold">System Status</h2>
-                {data && (
-                  <div className="flex items-center gap-2">
-                    <StatusIndicator
-                      status={
-                        data.status === "healthy" ? "healthy" : "unhealthy"
-                      }
-                      size="md"
-                    />
-                    <span className="text-muted-foreground font-mono text-xs uppercase tracking-wider">
-                      {data.status}
+      {/* ── Stat row ──────────────────────────────────────────────────────── */}
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        {isLoading ? (
+          Array.from({ length: 4 }).map((_, i) => (
+            <StatCardSkeleton key={i} />
+          ))
+        ) : (
+          <>
+            <StatCard
+              label="Services Online"
+              value={
+                data ? (
+                  <>
+                    <span className="text-emerald-500">{healthyCount}</span>
+                    <span className="text-muted-foreground text-lg">
+                      /{totalCount}
                     </span>
-                  </div>
-                )}
-              </div>
-              {data && (
-                <p className="text-muted-foreground mt-0.5 font-mono text-xs">
-                  {healthyCount}/{totalCount} services operational
-                </p>
-              )}
-            </div>
-            {data && (
-              <div className="text-right font-mono text-xs">
-                <span className="text-muted-foreground">Uptime</span>
-                <div className="text-emerald-500 text-lg font-semibold tabular-nums">
-                  99.9%
-                </div>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </motion.div>
+                  </>
+                ) : (
+                  "—"
+                )
+              }
+              sub={data ? `${totalCount - healthyCount} degraded or down` : undefined}
+              accent="muted"
+            />
 
-      {/* Loading */}
-      {isLoading && (
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-          {Array.from({ length: 7 }).map((_, i) => (
-            <Card key={i} className="border-border/50">
-              <CardContent className="space-y-3 py-4">
-                <Skeleton className="h-4 w-28" />
-                <Skeleton className="h-3 w-16" />
-              </CardContent>
-            </Card>
-          ))}
+            <StatCard
+              label="System Status"
+              value={
+                <span className="flex items-center gap-1.5">
+                  {overallStatusIcon(systemStatus)}
+                  <span
+                    className={
+                      statusAccent === "emerald"
+                        ? "text-emerald-500"
+                        : statusAccent === "amber"
+                          ? "text-amber-500"
+                          : "text-muted-foreground"
+                    }
+                  >
+                    {systemStatus ?? "—"}
+                  </span>
+                </span>
+              }
+              sub={
+                systemStatus === "healthy"
+                  ? "all systems nominal"
+                  : systemStatus === "degraded"
+                    ? "partial outage detected"
+                    : undefined
+              }
+            />
+
+            <StatCard
+              label="Active Providers"
+              value={isLoadingProviders ? "…" : (activeProviders ?? "—")}
+              sub={
+                providersData
+                  ? `of ${providersData.providers.length} configured`
+                  : undefined
+              }
+            />
+
+            <StatCard
+              label="Pipeline Runs"
+              value="—"
+              sub="no runs recorded today"
+            />
+          </>
+        )}
+      </div>
+
+      {/* ── Error banner ─────────────────────────────────────────────────── */}
+      {error && (
+        <div className="rounded-[var(--radius)] bg-destructive/10 px-3 py-2 font-mono text-xs text-destructive">
+          Failed to fetch health data: {error.message}
         </div>
       )}
 
-      {/* Error */}
-      {error && (
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          className="bg-destructive/10 text-destructive rounded-lg px-4 py-3 text-sm"
-        >
-          Failed to fetch service health: {error.message}
-        </motion.div>
-      )}
+      {/* ── Service health grid ───────────────────────────────────────────── */}
+      <div>
+        <p className="mb-2 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+          Microservices
+        </p>
+        {isLoading ? (
+          <div className="grid grid-cols-2 gap-2 md:grid-cols-3 lg:grid-cols-4">
+            {Array.from({ length: 5 }).map((_, i) => (
+              <ServiceCardSkeleton key={i} />
+            ))}
+          </div>
+        ) : data ? (
+          <div className="grid grid-cols-2 gap-2 md:grid-cols-3 lg:grid-cols-4">
+            {microservices.map((name) => (
+              <ServiceCard
+                key={name}
+                name={name}
+                status={data.services[name]}
+              />
+            ))}
+          </div>
+        ) : null}
+      </div>
 
-      {/* Service cards */}
-      {data && (
+      {/* ── Infrastructure section ────────────────────────────────────────── */}
+      <div>
+        <p className="mb-2 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+          Infrastructure
+        </p>
+        {isLoading ? (
+          <div className="space-y-1.5">
+            {Array.from({ length: 2 }).map((_, i) => (
+              <div key={i} className="rounded-[var(--radius)] bg-muted/40 px-3 py-2">
+                <Skeleton className="h-3 w-40" />
+              </div>
+            ))}
+          </div>
+        ) : data ? (
+          <div className="space-y-1.5">
+            {infraServices.map((name) => (
+              <InfraRow key={name} name={name} status={data.services[name]} />
+            ))}
+            {infraServices.length === 0 && (
+              <p className="font-mono text-xs text-muted-foreground">
+                No infrastructure services detected.
+              </p>
+            )}
+          </div>
+        ) : null}
+      </div>
+
+      {/* ── Provider chips ────────────────────────────────────────────────── */}
+      {providersData && providersData.providers.length > 0 && (
         <div>
-          <h3 className="text-muted-foreground mb-3 text-xs font-medium uppercase tracking-widest">
-            Services
-          </h3>
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-            {Object.entries(data.services).map(([name, status], i) => {
-              const Icon = SERVICE_ICONS[name] ?? Server;
-              return (
-                <motion.div
-                  key={name}
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.25, delay: i * 0.04 }}
-                >
-                  <Card className="border-border/50 transition-colors hover:border-primary/30">
-                    <CardHeader className="pb-2">
-                      <CardTitle className="flex items-center justify-between text-sm font-medium">
-                        <div className="flex items-center gap-2.5">
-                          <Icon className="text-muted-foreground h-4 w-4" />
-                          <span className="font-mono text-sm">{name}</span>
-                        </div>
-                        <StatusIndicator status={status} />
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <span
-                        className={`font-mono text-xs uppercase tracking-wider ${
-                          status === "healthy"
-                            ? "text-emerald-500"
-                            : status === "unhealthy"
-                              ? "text-amber-500"
-                              : "text-red-500"
-                        }`}
-                      >
-                        {status}
-                      </span>
-                    </CardContent>
-                  </Card>
-                </motion.div>
-              );
-            })}
+          <p className="mb-2 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+            LLM Providers
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {providersData.providers.map((provider) => (
+              <div
+                key={provider.id}
+                className="flex items-center gap-2 rounded-[var(--radius)] bg-muted/40 px-3 py-1.5"
+              >
+                <span
+                  className={`h-1.5 w-1.5 rounded-full ${provider.available ? "bg-emerald-500 shadow-[0_0_5px_rgba(34,197,94,0.6)]" : "bg-muted-foreground"}`}
+                />
+                <span className="font-mono text-xs">{provider.name}</span>
+                {provider.requires_key && !provider.available && (
+                  <span className="text-[9px] uppercase tracking-wider text-amber-500">
+                    no key
+                  </span>
+                )}
+              </div>
+            ))}
           </div>
         </div>
       )}
-    </div>
+
+      {/* ── Refresh note ──────────────────────────────────────────────────── */}
+      <p className="font-mono text-[10px] text-muted-foreground/50">
+        Auto-refreshes every 30s &middot; Last updated: {new Date().toLocaleTimeString()}
+      </p>
+    </motion.div>
   );
 }
