@@ -132,7 +132,17 @@ Each MCP server exposes domain-specific tools to agents:
 | `/topology` | Dependency graph — XYFlow interactive |
 | `/evaluation` | GraphRAG eval — side-by-side comparison, judge ProviderSelector |
 
-**Frontend Architecture Rules (adapted from Softica patterns):**
+**Skill Usage — MANDATORY:**
+
+| Working on | Load skill FIRST |
+|------------|-----------------|
+| Any new page or UI surface | Read `frontend/docs/patterns/page-layout.md` first. Pick pattern B/C/D. State it. |
+| Any `components/ui/` or UI change | `shadcn` skill — check registry + audit |
+| After completing UI work | Run `/arch-review` agent to verify compliance |
+
+**Do NOT use `frontend-design`** for pages. Follow `frontend/docs/patterns/page-layout.md` instead.
+
+**Frontend Architecture Rules (adapted from Salon Svitlo CRM):**
 
 1. **Services Layer** (`src/services/{domain}/`): Each resource has `schema.ts` (Zod DTOs), `query-options.ts` (TanStack Query key factories), `actions.ts` (server actions with `safeAction`). Client hooks use `unwrap(await action())`.
 
@@ -149,6 +159,12 @@ Each MCP server exposes domain-specific tools to agents:
 7. **Provider icons**: `@lobehub/icons` for brand logos (Anthropic, OpenAI, Gemini.Color, Ollama). Fallback to `lucide-react` BrainCircuit for unknown providers. Display map at `src/lib/provider-display.ts`.
 
 8. **Runtime API keys**: Stored in `sessionStorage` per provider. Sent per-request in body. Never persisted. `src/lib/provider-keys.ts`.
+
+9. **Charts**: nivo only (never recharts). `@nivo/line`, `@nivo/bar`, `@nivo/radar`, `@nivo/pie`, `@nivo/heatmap`. Always use `Responsive*` wrappers. Colors from CSS variables.
+
+10. **Density**: This is a monitoring tool. Padding: `p-3` stat cards, `p-4` content cards. Gaps: `gap-3` cards, `gap-4` sections. Font: `text-xs` labels, `text-sm` body, `text-base` headings. See `frontend/docs/patterns/page-layout.md`.
+
+11. **Page patterns**: Every page fits pattern B (bento), C (hybrid), or D (split-pane). See `frontend/docs/patterns/page-layout.md` for decision flow and anatomy.
 
 ### GraphRAG vs Naive RAG
 
