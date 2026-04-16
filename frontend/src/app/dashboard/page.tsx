@@ -2,6 +2,7 @@
 
 import { motion } from "motion/react";
 import { ServiceMetrics } from "./_components/service-metrics";
+import { LiveMonitor } from "./_components/live-monitor";
 import { cn } from "@/lib/utils";
 
 const SERVICES = [
@@ -68,6 +69,8 @@ export default function DashboardPage() {
           </motion.div>
         ))}
       </div>
+
+      <LiveMonitor />
     </div>
   );
 }
