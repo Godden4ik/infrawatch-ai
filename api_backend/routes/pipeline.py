@@ -6,7 +6,7 @@ from typing import AsyncGenerator
 
 from fastapi import APIRouter
 from fastapi.responses import StreamingResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from agents import stream_pipeline
 
@@ -16,6 +16,7 @@ router = APIRouter()
 class PipelineRequest(BaseModel):
     llm_provider: str = "anthropic"
     llm_model: str | None = None
+    api_key: str | None = Field(None, repr=False)
 
 
 def _extract_text(content) -> str:
@@ -100,6 +101,7 @@ async def _stream_events(req: PipelineRequest) -> AsyncGenerator[str, None]:
                 verbose=False,
                 llm_provider=req.llm_provider,
                 llm_model=req.llm_model,
+                api_key=req.api_key,
             ):
                 line = _to_sse(event)
                 if line:
