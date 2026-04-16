@@ -34,7 +34,9 @@ export default function RootLayout({
             <ToastProvider>
               <SidebarProvider>
                 <AppSidebar />
-                <main className="flex-1 overflow-auto bg-background px-6 py-4">{children}</main>
+                <main className="flex-1 overflow-auto bg-background">
+                  <div className="h-full px-6 py-6">{children}</div>
+                </main>
               </SidebarProvider>
             </ToastProvider>
           </TooltipProvider>
