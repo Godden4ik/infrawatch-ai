@@ -4,8 +4,7 @@ import { useState } from "react";
 import { motion } from "motion/react";
 import { useQuery } from "@tanstack/react-query";
 import { usePipelineStream } from "@/services/pipeline/use-pipeline";
-import { modelQueries } from "@/services/models/query-options";
-import { formatSize } from "@/services/models/schema";
+import { providerQueries } from "@/services/providers/query-options";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -30,17 +29,18 @@ export function PipelineControls() {
   const [ollamaModel, setOllamaModel] = useState<string>("");
   const mutation = usePipelineStream();
 
-  const { data: modelsData, isLoading: modelsLoading } = useQuery({
-    ...modelQueries.list(),
+  const { data: providersData, isLoading: providersLoading } = useQuery({
+    ...providerQueries.list(),
     enabled: provider === "ollama",
   });
 
-  const models = modelsData?.models ?? [];
-  const ollamaAvailable = modelsData?.status === "ok";
+  const ollamaProvider = providersData?.providers.find((p) => p.id === "ollama");
+  const models = ollamaProvider?.models ?? [];
+  const ollamaAvailable = ollamaProvider?.available ?? false;
 
   // Auto-select first model when models load
   if (models.length > 0 && !ollamaModel) {
-    setOllamaModel(models[0].name);
+    setOllamaModel(models[0].id);
   }
 
   return (
@@ -91,7 +91,7 @@ export function PipelineControls() {
               Model
             </label>
 
-            {modelsLoading ? (
+            {providersLoading ? (
               <div className="flex items-center gap-2 py-2 text-sm text-muted-foreground">
                 <Loader2 className="h-3.5 w-3.5 animate-spin" />
                 Loading models...
@@ -115,11 +115,11 @@ export function PipelineControls() {
                   <SelectGroup>
                     <SelectLabel>Available Models</SelectLabel>
                     {models.map((m) => (
-                      <SelectItem key={m.name} value={m.name}>
+                      <SelectItem key={m.id} value={m.id}>
                         <div className="flex w-full items-center justify-between gap-3">
                           <span className="font-mono text-sm">{m.name}</span>
                           <span className="text-xs text-muted-foreground">
-                            {m.parameter_size || formatSize(m.size)}
+                            {m.param_size}
                           </span>
                         </div>
                       </SelectItem>
