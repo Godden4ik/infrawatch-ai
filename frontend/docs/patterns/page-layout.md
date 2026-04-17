@@ -11,7 +11,7 @@ Adapted from Salon Svitlo CRM architecture guidelines.
 | Page | Route | Pattern | Description |
 |------|-------|---------|-------------|
 | Overview | `/` | **B — Bento** | Service health cards, connectivity status, system stats |
-| Service Health | `/dashboard` | **C — Hybrid** | Stat cards + nivo time-series charts per service |
+| Service Health | `/dashboard` | **C — Hybrid** | SSE-streamed sparkline cards + live nivo monitor (26 metrics, 2s refresh, 5m window) |
 | Anomaly Injection | `/anomaly` | **B — Bento** | Scenario buttons + inject form + active anomalies |
 | Agent Pipeline | `/pipeline` | **D — Split-pane** | Controls sidebar + streaming agent output |
 | Topology | `/topology` | **D — Split-pane** | ReactFlow graph (90° orthogonal edges, dotted animated) + blast radius panel |

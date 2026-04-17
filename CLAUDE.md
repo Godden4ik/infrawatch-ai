@@ -107,6 +107,10 @@ Monitor Agent → Analyst Agent → Responder Agent
 - Provider + model + api_key threaded through `run_pipeline` / `stream_pipeline` → `build_graph` → each node via `functools.partial`
 - Ollama requires ≥14B model for reliable structured tool calling; 7B models hallucinate tool results in multi-step pipelines
 
+### Live Metrics Stream
+
+`GET /metrics/stream` (`api_backend/routes/metrics_stream.py`) — SSE endpoint that polls all 26 Prometheus metrics every 2 seconds and emits batched JSON events. Frontend consumes via `useMetricsStream()` hook (module-level singleton EventSource + circular buffer, 150 points ≈ 5min). Both sparkline cards and nivo LiveMonitor charts share the same stream. Proxied through `frontend/src/app/api/metrics/stream/route.ts`.
+
 ### MCP Servers
 
 Each MCP server exposes domain-specific tools to agents:
@@ -126,7 +130,7 @@ Each MCP server exposes domain-specific tools to agents:
 | Route | Purpose |
 |-------|---------|
 | `/` | System overview — connectivity checks |
-| `/dashboard` | Service health — live Prometheus metrics |
+| `/dashboard` | Service health — SSE-streamed sparklines + full nivo live monitor (2s refresh, 5m window) |
 | `/anomaly` | Anomaly injection — presets + manual |
 | `/pipeline` | Agent pipeline — SSE streaming, ProviderSelector |
 | `/topology` | Dependency graph — XYFlow interactive |
