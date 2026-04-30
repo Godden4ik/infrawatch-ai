@@ -2,167 +2,188 @@
 
 import { useState } from "react";
 import { motion } from "motion/react";
-import { useQuery } from "@tanstack/react-query";
-import { usePipelineStream } from "@/services/pipeline/use-pipeline";
-import { modelQueries } from "@/services/models/query-options";
-import { formatSize } from "@/services/models/schema";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
-  Select,
-  SelectContent,
-  SelectGroup,
-  SelectItem,
-  SelectLabel,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Play, Loader2, Server, Cloud, AlertCircle } from "lucide-react";
+  Activity,
+  CheckCircle2,
+  Loader2,
+  Play,
+  RadioTower,
+  ShieldCheck,
+  Sparkles,
+} from "lucide-react";
+import { usePipelineStream } from "@/services/pipeline/use-pipeline";
+import type { PipelineState } from "@/services/pipeline/schema";
+import type { ProviderSelection } from "@/components/provider-selector";
+import { ProviderCombobox } from "@/components/provider-combobox";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardAction,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 
-const PROVIDERS = [
-  { value: "anthropic", label: "Anthropic", icon: Cloud },
-  { value: "ollama", label: "Ollama", icon: Server },
-] as const;
+interface PipelineControlsProps {
+  state?: PipelineState;
+}
 
-export function PipelineControls() {
-  const [provider, setProvider] = useState("anthropic");
-  const [ollamaModel, setOllamaModel] = useState<string>("");
-  const mutation = usePipelineStream();
+function statusCopy(status: PipelineState["status"] | undefined) {
+  if (status === "running") {
+    return {
+      label: "Streaming",
+      detail: "Live events updating in real time",
+      tone: "border-primary/20 bg-primary/10 text-primary",
+      icon: RadioTower,
+    };
+  }
 
-  const { data: modelsData, isLoading: modelsLoading } = useQuery({
-    ...modelQueries.list(),
-    enabled: provider === "ollama",
+  if (status === "complete") {
+    return {
+      label: "Complete",
+      detail: "Execution finished cleanly",
+      tone: "border-success/20 bg-success/10 text-success",
+      icon: CheckCircle2,
+    };
+  }
+
+  if (status === "error") {
+    return {
+      label: "Failed",
+      detail: "Review runtime trace for failure details",
+      tone: "border-destructive/20 bg-destructive/10 text-destructive",
+      icon: Activity,
+    };
+  }
+
+  return {
+    label: "Ready",
+    detail: "Select healthy provider and launch trace",
+    tone: "border-border/70 bg-muted/30 text-muted-foreground",
+    icon: Sparkles,
+  };
+}
+
+export function PipelineControls({ state }: PipelineControlsProps) {
+  const [selection, setSelection] = useState<ProviderSelection>({
+    provider: "anthropic",
+    model: "claude-haiku-4-5-20251001",
   });
 
-  const models = modelsData?.models ?? [];
-  const ollamaAvailable = modelsData?.status === "ok";
+  const mutation = usePipelineStream();
+  const status = statusCopy(state?.status);
+  const StatusIcon = status.icon;
 
-  // Auto-select first model when models load
-  if (models.length > 0 && !ollamaModel) {
-    setOllamaModel(models[0].name);
+  function handleRun() {
+    mutation.mutate({
+      llmProvider: selection.provider,
+      llmModel: selection.model || undefined,
+    });
   }
 
   return (
-    <Card className="border-border/50">
-      <CardHeader className="pb-4">
-        <CardTitle className="text-base">Pipeline Controls</CardTitle>
+    <Card size="sm">
+      <CardHeader className="border-b border-border/60">
+        <CardTitle>Runtime Control</CardTitle>
+        <CardDescription>
+          Select a verified provider connection, choose model, then start streaming.
+        </CardDescription>
+        <CardAction>
+          <Badge variant="outline" className="font-mono text-[10px] uppercase">
+            Split-pane
+          </Badge>
+        </CardAction>
       </CardHeader>
-      <CardContent className="space-y-5">
-        <div className="space-y-2.5">
-          <label className="text-muted-foreground mb-1.5 block text-xs font-medium uppercase tracking-wider">
-            LLM Provider
-          </label>
-          <div className="bg-secondary/50 flex gap-1 rounded-lg p-1">
-            {PROVIDERS.map((p) => {
-              const Icon = p.icon;
-              return (
-                <button
-                  key={p.value}
-                  onClick={() => setProvider(p.value)}
-                  className={cn(
-                    "relative flex flex-1 items-center justify-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-colors",
-                    provider !== p.value && "text-muted-foreground hover:text-foreground",
-                  )}
-                >
-                  {provider === p.value && (
-                    <motion.div
-                      layoutId="provider-pill"
-                      className="bg-primary/15 border-primary/20 absolute inset-0 rounded-md border"
-                      transition={{ type: "spring", bounce: 0.15, duration: 0.4 }}
-                    />
-                  )}
-                  <Icon className="relative z-10 h-3.5 w-3.5" />
-                  <span className="relative z-10">{p.label}</span>
-                </button>
-              );
-            })}
+
+      <CardContent className="space-y-3 pt-3">
+        <div
+          className={cn(
+            "flex items-start gap-3 px-3 py-3 ring-1 ring-inset",
+            status.tone,
+          )}
+        >
+          <StatusIcon className="mt-0.5 h-4 w-4 shrink-0" />
+          <div>
+            <p className="font-mono text-[10px] uppercase tracking-[0.14em]">
+              {status.label}
+            </p>
+            <p className="mt-1 text-xs leading-5">{status.detail}</p>
           </div>
         </div>
 
-        {provider === "ollama" && (
-          <motion.div
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: "auto" }}
-            exit={{ opacity: 0, height: 0 }}
-            className="space-y-2.5"
-          >
-            <label className="text-muted-foreground mb-1.5 block text-xs font-medium uppercase tracking-wider">
-              Model
-            </label>
+        <ProviderCombobox
+          value={selection}
+          onChange={setSelection}
+        />
 
-            {modelsLoading ? (
-              <div className="flex items-center gap-2 py-2 text-sm text-muted-foreground">
-                <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                Loading models...
-              </div>
-            ) : !ollamaAvailable ? (
-              <div className="flex items-center gap-2 rounded-lg bg-destructive/10 px-3 py-2 text-sm text-destructive">
-                <AlertCircle className="h-4 w-4 shrink-0" />
-                Ollama unavailable. Is it running?
-              </div>
-            ) : models.length === 0 ? (
-              <div className="flex items-center gap-2 rounded-lg bg-destructive/10 px-3 py-2 text-sm text-destructive">
-                <AlertCircle className="h-4 w-4 shrink-0" />
-                No models installed. Run <code className="font-mono">ollama pull</code> first.
-              </div>
-            ) : (
-              <Select value={ollamaModel} onValueChange={(v) => setOllamaModel(v ?? "")}>
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Select a model" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectGroup>
-                    <SelectLabel>Available Models</SelectLabel>
-                    {models.map((m) => (
-                      <SelectItem key={m.name} value={m.name}>
-                        <div className="flex w-full items-center justify-between gap-3">
-                          <span className="font-mono text-sm">{m.name}</span>
-                          <span className="text-xs text-muted-foreground">
-                            {m.parameter_size || formatSize(m.size)}
-                          </span>
-                        </div>
-                      </SelectItem>
-                    ))}
-                  </SelectGroup>
-                </SelectContent>
-              </Select>
-            )}
-          </motion.div>
-        )}
+        <div className="space-y-2 bg-muted/30 px-3 py-3 ring-1 ring-inset ring-border/60">
+          <div className="flex items-center justify-between gap-3">
+            <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
+              Provider
+            </span>
+            <span className="font-mono text-xs text-foreground">
+              {selection.provider}
+            </span>
+          </div>
+          <div className="flex items-center justify-between gap-3">
+            <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
+              Model
+            </span>
+            <span className="max-w-[150px] truncate font-mono text-xs text-foreground">
+              {selection.model || "unassigned"}
+            </span>
+          </div>
+        </div>
 
         <Button
-          onClick={() =>
-            mutation.mutate({
-              llmProvider: provider,
-              llmModel: provider === "ollama" ? ollamaModel : undefined,
-            })
-          }
-          disabled={mutation.isPending || (provider === "ollama" && !ollamaModel)}
-          className="w-full gap-2 py-5 text-sm font-medium"
+          onClick={handleRun}
+          disabled={mutation.isPending || !selection.provider || !selection.model}
+          size="lg"
+          className="w-full justify-center gap-2"
         >
           {mutation.isPending ? (
             <>
               <Loader2 className="h-4 w-4 animate-spin" />
-              Running...
+              Running pipeline
             </>
           ) : (
             <>
               <Play className="h-4 w-4" />
-              Run Pipeline
+              Launch trace
             </>
           )}
         </Button>
 
-        {mutation.isError && (
+        <div className="space-y-2 bg-muted/30 px-3 py-3 ring-1 ring-inset ring-border/60">
+          <div className="flex items-center gap-2">
+            <ShieldCheck className="h-3.5 w-3.5 text-primary" />
+            <p className="text-xs font-medium text-foreground">Execution path</p>
+          </div>
+          {[
+            "Only healthy providers with valid stored credentials are listed.",
+            "Monitor validates anomaly from live telemetry.",
+            "Analyst maps service relationships and blast radius.",
+            "Responder turns evidence into remediation steps.",
+          ].map((item) => (
+            <div key={item} className="flex items-start gap-2 text-xs text-muted-foreground">
+              <span className="mt-1 h-1.5 w-1.5 shrink-0 bg-muted-foreground/60" />
+              <span>{item}</span>
+            </div>
+          ))}
+        </div>
+
+        {mutation.isError ? (
           <motion.p
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            className="text-destructive text-sm"
+            className="bg-destructive/10 px-3 py-2 text-xs text-destructive ring-1 ring-inset ring-destructive/20"
           >
             {mutation.error.message}
           </motion.p>
-        )}
+        ) : null}
       </CardContent>
     </Card>
   );

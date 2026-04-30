@@ -2,20 +2,24 @@
 
 import asyncio
 import json
+import logging
+import traceback
 from typing import AsyncGenerator
 
 from fastapi import APIRouter
 from fastapi.responses import StreamingResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from agents import stream_pipeline
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 
 class PipelineRequest(BaseModel):
     llm_provider: str = "anthropic"
     llm_model: str | None = None
+    api_key: str | None = Field(None, repr=False)
 
 
 def _extract_text(content) -> str:
@@ -86,6 +90,30 @@ def _to_sse(event: dict) -> str | None:
     return None
 
 
+def _iter_leaf_exceptions(exc: BaseException):
+    """Yield deepest nested exceptions, flattening ExceptionGroup trees."""
+    nested = getattr(exc, "exceptions", None)
+    if nested:
+        for child in nested:
+            yield from _iter_leaf_exceptions(child)
+        return
+    yield exc
+
+
+def _describe_exception(exc: BaseException) -> str:
+    """Return the most actionable leaf error from nested async exception groups."""
+    leaf = next(iter(_iter_leaf_exceptions(exc)), exc)
+
+    if isinstance(leaf, KeyError) and leaf.args:
+        return f"Unknown provider: {leaf.args[0]}"
+
+    message = str(leaf).strip()
+    if message:
+        return message
+
+    return leaf.__class__.__name__
+
+
 async def _stream_events(req: PipelineRequest) -> AsyncGenerator[str, None]:
     """Run pipeline in a dedicated asyncio task; relay SSE via a queue.
 
@@ -100,12 +128,19 @@ async def _stream_events(req: PipelineRequest) -> AsyncGenerator[str, None]:
                 verbose=False,
                 llm_provider=req.llm_provider,
                 llm_model=req.llm_model,
+                api_key=req.api_key,
             ):
                 line = _to_sse(event)
                 if line:
                     await queue.put(f"data: {line}\n\n")
         except Exception as exc:
-            err = json.dumps({"type": "error", "message": str(exc)})
+            message = _describe_exception(exc)
+            logger.error(
+                "Pipeline stream failed: %s\n%s",
+                message,
+                "".join(traceback.format_exception(exc)),
+            )
+            err = json.dumps({"type": "error", "message": message})
             await queue.put(f"data: {err}\n\n")
         finally:
             await queue.put(None)  # sentinel

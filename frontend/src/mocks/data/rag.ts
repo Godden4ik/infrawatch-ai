@@ -3,38 +3,30 @@ import type { RagResult } from "@/services/rag/schema";
 export function getMockRagResult(query: string): RagResult {
   return {
     query,
+    judge_provider: "anthropic",
+    judge_model: "claude-haiku-4-5-20251001",
+    content_overlap: 0.75,
     graphrag: {
       runbook_results: [
         {
-          id: "rb-1",
-          title: "Redis Cache Failure Recovery",
+          runbook_id: "RB-001",
+          runbook_title: "Redis Cache Failure Recovery",
           severity: "critical",
-          service: "redis-cache",
-          steps: [
-            "Check redis-cache pod health",
-            "Verify memory usage",
-            "Flush stale keys if memory > 90%",
-            "Restart service if unresponsive",
-          ],
-          graph_context: {
-            downstream_services: ["payment-service", "order-service"],
-            blast_radius: 3,
-          },
+          step_title: "Recover Redis primary",
+          content:
+            "Check redis-cache pod health. Verify memory usage. Flush stale keys if memory > 90%. Restart service if unresponsive.",
+          applies_to_services: ["redis-cache"],
+          downstream_dependencies: ["payment-service", "order-service"],
         },
         {
-          id: "rb-2",
-          title: "Payment Service Latency Spike",
+          runbook_id: "RB-002",
+          runbook_title: "Payment Service Latency Spike",
           severity: "high",
-          service: "payment-service",
-          steps: [
-            "Check P95 latency in Grafana",
-            "Verify redis-cache connectivity",
-            "Scale horizontally if load-related",
-          ],
-          graph_context: {
-            upstream_dependency: "redis-cache",
-            blast_radius: 1,
-          },
+          step_title: "Reduce latency",
+          content:
+            "Check P95 latency in Grafana. Verify redis-cache connectivity. Scale horizontally if load-related.",
+          applies_to_services: ["payment-service"],
+          referenced_services: ["redis-cache"],
         },
       ],
       incident_results: [
@@ -62,29 +54,31 @@ export function getMockRagResult(query: string): RagResult {
         dependents: ["payment-service", "order-service"],
         blast_radius: 3,
       },
+      metrics: {
+        result_count: 4,
+        context_richness: 7,
+        services_found: ["order-service", "payment-service", "redis-cache"],
+        llm_content_relevance: 9,
+        llm_actionability: 8,
+      },
     },
     naive: {
       runbook_results: [
         {
-          id: "rb-1",
-          title: "Redis Cache Failure Recovery",
+          runbook_id: "RB-001",
+          runbook_title: "Redis Cache Failure Recovery",
           severity: "critical",
-          steps: [
-            "Check redis-cache pod health",
-            "Verify memory usage",
-            "Flush stale keys if memory > 90%",
-            "Restart service if unresponsive",
-          ],
+          step_title: "Recover Redis primary",
+          content:
+            "Check redis-cache pod health. Verify memory usage. Flush stale keys if memory > 90%. Restart service if unresponsive.",
         },
         {
-          id: "rb-2",
-          title: "Payment Service Latency Spike",
+          runbook_id: "RB-002",
+          runbook_title: "Payment Service Latency Spike",
           severity: "high",
-          steps: [
-            "Check P95 latency in Grafana",
-            "Verify redis-cache connectivity",
-            "Scale horizontally if load-related",
-          ],
+          step_title: "Reduce latency",
+          content:
+            "Check P95 latency in Grafana. Verify redis-cache connectivity. Scale horizontally if load-related.",
         },
       ],
       incident_results: [
@@ -101,6 +95,13 @@ export function getMockRagResult(query: string): RagResult {
           resolution: "Auto-scaled to 3 replicas",
         },
       ],
+      metrics: {
+        result_count: 4,
+        context_richness: 0,
+        services_found: [],
+        llm_content_relevance: 8,
+        llm_actionability: 7,
+      },
     },
   };
 }

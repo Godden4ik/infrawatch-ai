@@ -1,5 +1,3 @@
-import { randNumber } from "@ngneat/falso";
-
 function generateTimeSeries(
   baseValue: number,
   variance: number,

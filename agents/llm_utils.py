@@ -2,7 +2,7 @@
 
 import logging
 
-from langchain_anthropic import ChatAnthropic
+from langchain_core.language_models import BaseChatModel
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage, ToolMessage
 from langchain_core.tools import BaseTool
 
@@ -13,7 +13,7 @@ _TOOL_RESULT_MAX_CHARS = 3000  # truncate tool results to keep context small
 
 
 async def run_agent_with_tools(
-    llm: ChatAnthropic,
+    llm: BaseChatModel,
     tools: list[BaseTool],
     system_prompt: str,
     human_message: str,
