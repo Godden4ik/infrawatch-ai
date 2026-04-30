@@ -1,6 +1,8 @@
 """Shared tool-calling loop helper for agent nodes."""
 
 import logging
+import re
+from typing import Any
 
 from langchain_core.language_models import BaseChatModel
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage, ToolMessage
@@ -10,6 +12,38 @@ logger = logging.getLogger(__name__)
 
 
 _TOOL_RESULT_MAX_CHARS = 3000  # truncate tool results to keep context small
+
+
+def sanitize_tool_output(content: Any) -> str:
+    """Sanitize untrusted tool output before injecting it into LLM context.
+
+    Preserve JSON parseability for downstream components that inspect tool
+    outputs from message history.
+    """
+    raw = str(content)
+    trimmed = raw.lstrip()
+    looks_like_json = trimmed.startswith("{") or trimmed.startswith("[")
+
+    sanitized = raw.replace("```", "'''")
+    sanitized = re.sub(
+        r"(?i)\b(system|developer|user|assistant)\s*:",
+        lambda m: f"{m.group(1)}_(untrusted):",
+        sanitized,
+    )
+    sanitized = re.sub(
+        r"(?i)\b(ignore previous instructions|disregard previous instructions|override your instructions)\b",
+        "[UNTRUSTED_INSTRUCTION_IGNORED]",
+        sanitized,
+    )
+    sanitized = re.sub(
+        r"(?i)\b(you must obey|follow these instructions exactly)\b",
+        "[UNTRUSTED_INSTRUCTION_IGNORED]",
+        sanitized,
+    )
+
+    if looks_like_json:
+        return sanitized
+    return f"<<TOOL_OUTPUT_DATA>>\n{sanitized}\n<</TOOL_OUTPUT_DATA>>"
 
 
 async def run_agent_with_tools(
@@ -52,7 +86,7 @@ async def run_agent_with_tools(
                 result = await tool.ainvoke(tc["args"])
                 result_preview = str(result)[:120].replace("\n", " ")
                 logger.info("  [TOOL] %s(%s) → %s…", tc["name"], args_summary, result_preview)
-            result_str = str(result)
+            result_str = sanitize_tool_output(result)
             if len(result_str) > _TOOL_RESULT_MAX_CHARS:
                 result_str = result_str[:_TOOL_RESULT_MAX_CHARS] + "\n[truncated]"
             messages.append(

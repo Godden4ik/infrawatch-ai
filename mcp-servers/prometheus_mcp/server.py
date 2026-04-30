@@ -8,6 +8,36 @@ from mcp.server.fastmcp import FastMCP
 
 PROMETHEUS_URL = os.getenv("PROMETHEUS_URL", "http://localhost:9090")
 
+
+def _service_base_url(
+    service_name: str,
+    host_env: str,
+    default_host: str,
+    default_port: int,
+) -> str:
+    """Resolve service URL in Docker or local runs.
+
+    Priority:
+    1) explicit *_URL env var
+    2) *_HOST env var + known port
+    3) localhost + known port
+    """
+    explicit_url = os.getenv(f"{host_env.replace('_HOST', '_URL')}")
+    if explicit_url:
+        return explicit_url
+
+    host = os.getenv(host_env, default_host)
+    return f"http://{host}:{default_port}"
+
+
+SERVICE_LOG_URLS = {
+    "api-gateway": _service_base_url("api-gateway", "API_GATEWAY_HOST", "localhost", 8080),
+    "payment-service": _service_base_url("payment-service", "PAYMENT_SERVICE_HOST", "localhost", 8001),
+    "user-service": _service_base_url("user-service", "USER_SERVICE_HOST", "localhost", 8002),
+    "order-service": _service_base_url("order-service", "ORDER_SERVICE_HOST", "localhost", 8003),
+    "redis-cache": _service_base_url("redis-cache", "REDIS_CACHE_HOST", "localhost", 8004),
+}
+
 mcp = FastMCP(
     name="prometheus-mcp",
     instructions=(
@@ -23,6 +53,10 @@ mcp = FastMCP(
 
 def _make_client() -> httpx.AsyncClient:
     return httpx.AsyncClient(base_url=PROMETHEUS_URL, timeout=30.0)
+
+
+def _make_service_client(base_url: str) -> httpx.AsyncClient:
+    return httpx.AsyncClient(base_url=base_url, timeout=10.0)
 
 
 @mcp.tool()
@@ -54,6 +88,52 @@ async def execute_promql(
         return json.dumps({"error": f"Prometheus returned {e.response.status_code}", "detail": e.response.text})
     except httpx.ConnectError:
         return json.dumps({"error": f"Cannot connect to Prometheus at {PROMETHEUS_URL}"})
+
+
+@mcp.tool()
+async def get_service_logs(service_name: str, level: str = "INFO", limit: int = 200) -> str:
+    """Fetch recent structured application logs for a service.
+
+    Reads from each service's `/logs` endpoint and returns bounded JSON entries.
+    """
+    base_url = SERVICE_LOG_URLS.get(service_name)
+    if not base_url:
+        return json.dumps(
+            {
+                "error": f"Unknown service '{service_name}'",
+                "known_services": sorted(SERVICE_LOG_URLS.keys()),
+            }
+        )
+
+    capped_limit = max(1, min(int(limit), 500))
+    level_upper = level.upper()
+
+    try:
+        async with _make_service_client(base_url) as client:
+            resp = await client.get("/logs", params={"level": level_upper, "limit": capped_limit})
+            resp.raise_for_status()
+            data = resp.json()
+            return json.dumps(
+                {
+                    "service": service_name,
+                    "source": f"{base_url}/logs",
+                    "level": level_upper,
+                    "limit": capped_limit,
+                    "truncated": bool(data.get("truncated", False)),
+                    "entries": data.get("entries", []),
+                },
+                indent=2,
+            )
+    except httpx.HTTPStatusError as e:
+        return json.dumps(
+            {
+                "error": f"Service logs endpoint returned {e.response.status_code}",
+                "service": service_name,
+                "detail": e.response.text,
+            }
+        )
+    except httpx.ConnectError:
+        return json.dumps({"error": f"Cannot connect to service '{service_name}' logs at {base_url}"})
 
 
 @mcp.tool()

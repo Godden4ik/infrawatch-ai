@@ -17,6 +17,7 @@ def test_service_ports_are_unique():
 
 def test_scenarios_registered():
     assert "cascade" in SCENARIOS
+    assert "cascade_malicious_logs" in SCENARIOS
     assert "reset" in SCENARIOS
 
 

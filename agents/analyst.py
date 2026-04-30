@@ -24,6 +24,84 @@ def _parse_analysis(text: str) -> dict:
             pass
     return {}
 
+def _validate_analysis(raw: dict, fallback_text: str) -> dict:
+    """Validate and coerce analysis JSON into a safe schema."""
+    safe_root_cause = "Root cause could not be reliably parsed from model output."
+    safe_confidence = 0.0
+    safe_blast_radius: list[dict] = []
+    safe_similar_incidents: list[str] = []
+    safe_relevant_runbooks: list[str] = []
+
+    if not isinstance(raw, dict) or not raw:
+        snippet = re.sub(r"\s+", " ", fallback_text or "").strip()
+        if snippet:
+            safe_root_cause = f"{safe_root_cause} (excerpt: {snippet[:120]}...)"
+        return {
+            "root_cause": safe_root_cause,
+            "confidence": safe_confidence,
+            "blast_radius": safe_blast_radius,
+            "similar_incidents": safe_similar_incidents,
+            "relevant_runbooks": safe_relevant_runbooks,
+        }
+
+    root_cause = raw.get("root_cause")
+    if not isinstance(root_cause, str) or not root_cause.strip():
+        root_cause = safe_root_cause
+
+    confidence = raw.get("confidence", safe_confidence)
+    if isinstance(confidence, bool) or not isinstance(confidence, (int, float)):
+        confidence = safe_confidence
+    else:
+        confidence = float(confidence)
+        if confidence < 0.0 or confidence > 1.0:
+            confidence = safe_confidence
+
+    impact_levels = {"direct", "indirect"}
+    slo_levels = {"latency", "error_rate", "both"}
+
+    blast_radius_raw = raw.get("blast_radius", [])
+    blast_radius: list[dict] = []
+    if isinstance(blast_radius_raw, list):
+        for item in blast_radius_raw:
+            if not isinstance(item, dict):
+                continue
+            impact_level = item.get("impact_level")
+            slo_at_risk = item.get("slo_at_risk")
+            if (
+                isinstance(impact_level, str)
+                and isinstance(slo_at_risk, str)
+                and impact_level in impact_levels
+                and slo_at_risk in slo_levels
+            ):
+                blast_radius.append(
+                    {
+                        "service": item.get("service", ""),
+                        "impact_level": impact_level,
+                        "slo_at_risk": slo_at_risk,
+                    }
+                )
+
+    def _coerce_id_list(value: object) -> list[str]:
+        if not isinstance(value, list):
+            return []
+        ids: list[str] = []
+        for v in value:
+            if isinstance(v, str) and v.strip():
+                ids.append(v.strip())
+        return ids
+
+    similar_incidents = _coerce_id_list(raw.get("similar_incidents", safe_similar_incidents))
+    relevant_runbooks = _coerce_id_list(raw.get("relevant_runbooks", safe_relevant_runbooks))
+
+    return {
+        "root_cause": root_cause,
+        "confidence": confidence,
+        "blast_radius": blast_radius,
+        "similar_incidents": similar_incidents,
+        "relevant_runbooks": relevant_runbooks,
+    }
+
+
 
 async def analyst_node(state: PipelineState, tools: list[BaseTool], llm_provider: str = "anthropic", llm_model: str | None = None, api_key: str | None = None) -> dict:
     """Analyze anomalies by querying the dependency graph for root cause."""
@@ -41,11 +119,16 @@ async def analyst_node(state: PipelineState, tools: list[BaseTool], llm_provider
         human_message=(
             f"Detected anomalies:\n{anomalies_json}\n\n"
             f"Health summary: {state.get('health_summary', 'N/A')}\n\n"
-            "Trace the root cause through the dependency graph and assess blast radius."
+            "Trace the root cause through the dependency graph and assess blast radius.\n"
+            "For each anomalous service, call get_service_logs(service_name=<service>, level='INFO', limit=120) "
+            "to gather operational evidence from recent logs.\n"
+            "If logs indicate repeated timeout, DNS, or upstream 5xx patterns related to a third-party dependency, "
+            "include that explicitly in the root cause reasoning."
         ),
     )
 
-    analysis = _parse_analysis(content)
+    analysis_raw = _parse_analysis(content)
+    analysis = _validate_analysis(analysis_raw, fallback_text=content)
     logger.info("  Root cause: %s", analysis.get("root_cause", "(not parsed)")[:120])
     logger.info("  Confidence: %.2f | Blast radius: %d service(s)",
                 analysis.get("confidence", 0.5), len(analysis.get("blast_radius", [])))
@@ -117,9 +200,9 @@ async def analyst_node(state: PipelineState, tools: list[BaseTool], llm_provider
 
     return {
         "messages": messages,
-        "root_cause": analysis.get("root_cause", content),
+        "root_cause": analysis.get("root_cause", ""),
         "blast_radius": analysis.get("blast_radius", []),
-        "confidence": analysis.get("confidence", 0.5),
+        "confidence": analysis.get("confidence", 0.0),
         "similar_incidents": similar_incidents,
         "relevant_runbooks": relevant_runbooks,
         "iteration": state.get("iteration", 0) + 1,

@@ -19,6 +19,7 @@ _spec.loader.exec_module(_mod)
 execute_promql = _mod.execute_promql
 list_metrics = _mod.list_metrics
 get_targets = _mod.get_targets
+get_service_logs = _mod.get_service_logs
 
 
 class MockAsyncClient:
@@ -108,3 +109,26 @@ async def test_get_targets():
         assert len(result) == 1
         assert result[0]["job"] == "api-gateway"
         assert result[0]["health"] == "up"
+
+
+@pytest.mark.asyncio
+async def test_get_service_logs_success():
+    mock_logs = {
+        "service": "payment-service",
+        "level": "INFO",
+        "entries": [{"event_type": "transaction_failed", "message": "boom"}],
+        "truncated": False,
+    }
+    with patch.dict(_mod.SERVICE_LOG_URLS, {"payment-service": "http://localhost:8001"}), \
+         patch.object(_mod, "_make_service_client", return_value=MockAsyncClient(lambda *a, **kw: _mock_response(mock_logs))):
+        result = json.loads(await get_service_logs("payment-service", level="INFO", limit=20))
+        assert result["service"] == "payment-service"
+        assert len(result["entries"]) == 1
+        assert result["entries"][0]["event_type"] == "transaction_failed"
+
+
+@pytest.mark.asyncio
+async def test_get_service_logs_unknown_service():
+    result = json.loads(await get_service_logs("unknown-service"))
+    assert "error" in result
+    assert "Unknown service" in result["error"]
