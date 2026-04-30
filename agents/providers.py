@@ -29,7 +29,7 @@ PROVIDER_REGISTRY: dict[str, dict[str, Any]] = {
         "module": "langchain_openai",
         "class": "ChatOpenAI",
         "key_env": "OPENAI_API_KEY",
-        "key_kwarg": "openai_api_key",
+        "key_kwarg": "api_key",
         "default_model": "gpt-4o-mini",
         "models": [
             "gpt-4o-mini",
@@ -57,7 +57,7 @@ PROVIDER_REGISTRY: dict[str, dict[str, Any]] = {
         "module": "langchain_openai",
         "class": "ChatOpenAI",
         "key_env": "DEEPSEEK_API_KEY",
-        "key_kwarg": "openai_api_key",
+        "key_kwarg": "api_key",
         "default_model": "deepseek-chat",
         "models": [
             "deepseek-chat",

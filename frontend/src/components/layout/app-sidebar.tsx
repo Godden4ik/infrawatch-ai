@@ -10,6 +10,7 @@ import {
   FlaskConical,
   KeyRound,
   LayoutDashboard,
+  Target,
 } from "lucide-react";
 import {
   Sidebar,
@@ -43,6 +44,7 @@ const NAV_SECTIONS = [
       { href: "/pipeline", label: "Agent Pipeline", icon: Workflow },
       { href: "/topology", label: "Topology", icon: Network },
       { href: "/evaluation", label: "RAG Evaluation", icon: FlaskConical },
+      { href: "/evaluation/benchmark", label: "Accuracy Benchmark", icon: Target },
     ],
   },
   {

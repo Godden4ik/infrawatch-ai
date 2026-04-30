@@ -10,6 +10,7 @@ import {
   LayoutDashboard,
   Menu,
   Network,
+  Target,
   Workflow,
   Zap,
 } from "lucide-react";
@@ -30,6 +31,7 @@ const NAV_TABS = [
   { href: "/pipeline", label: "Pipeline", icon: Workflow },
   { href: "/topology", label: "Topology", icon: Network },
   { href: "/evaluation", label: "Evaluation", icon: FlaskConical },
+  { href: "/evaluation/benchmark", label: "Accuracy", icon: Target },
   { href: "/providers", label: "Providers", icon: KeyRound },
 ] as const;
 
