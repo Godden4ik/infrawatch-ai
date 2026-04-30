@@ -9,7 +9,7 @@ from agents.config import MCP_SERVERS
 MONITOR_TOOLS = {"execute_promql", "list_metrics", "get_targets", "list_alerts", "get_panel"}
 ANALYST_TOOLS = {
     "run_cypher", "get_service_dependencies", "get_blast_radius",
-    "search_runbooks", "find_similar_incidents",
+    "search_runbooks", "find_similar_incidents", "get_service_logs",
 }
 RESPONDER_TOOLS = {
     "get_blast_radius", "get_service_dependencies",
