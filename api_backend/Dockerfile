@@ -14,6 +14,8 @@ COPY agents/ agents/
 COPY graph/ graph/
 COPY mcp-servers/ mcp-servers/
 COPY api_backend/ api_backend/
+COPY scripts/ scripts/
+COPY scenarios/ scenarios/
 
 ENV PYTHONPATH=/project
 

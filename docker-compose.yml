@@ -104,11 +104,21 @@ services:
       - REDIS_CACHE_HOST=redis-cache
       - NEO4J_HOST=neo4j
       - OLLAMA_URL=http://host.docker.internal:11434
+      # Benchmark service URLs (internal Docker network)
+      - API_GATEWAY_URL=http://api-gateway:8000
+      - PAYMENT_SERVICE_URL=http://payment-service:8001
+      - USER_SERVICE_URL=http://user-service:8002
+      - ORDER_SERVICE_URL=http://order-service:8003
+      - REDIS_CACHE_URL=http://redis-cache:8004
+      - GOLD_DATASET_PATH=scenarios/gold_truth.json
+      - BENCHMARK_RESULTS_PATH=scenarios/benchmark_results.json
     networks:
       - infrawatch
     depends_on:
       - prometheus
       - neo4j
+    volumes:
+      - ./scenarios:/project/scenarios
 
   frontend:
     build:

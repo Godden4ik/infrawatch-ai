@@ -1,0 +1,72 @@
+[
+  {
+    "id": "scenario-001",
+    "name": "Redis Cache Failure - Cascade",
+    "anomaly": {
+      "service": "redis-cache",
+      "type": "cache_failure"
+    },
+    "expected": {
+      "root_cause": "redis-cache",
+      "affected_services": ["redis-cache", "payment-service", "user-service", "order-service"],
+      "relevant_runbooks": ["RB-001"]
+    },
+    "category": "cascade"
+  },
+  {
+    "id": "scenario-002",
+    "name": "Payment Service High Latency",
+    "anomaly": {
+      "service": "payment-service",
+      "type": "latency"
+    },
+    "expected": {
+      "root_cause": "payment-service",
+      "affected_services": ["payment-service", "order-service"],
+      "relevant_runbooks": ["RB-002"]
+    },
+    "category": "latency"
+  },
+  {
+    "id": "scenario-003",
+    "name": "User Service Memory Leak",
+    "anomaly": {
+      "service": "user-service",
+      "type": "memory_leak"
+    },
+    "expected": {
+      "root_cause": "user-service",
+      "affected_services": ["user-service", "redis-cache"],
+      "relevant_runbooks": ["RB-006"]
+    },
+    "category": "memory"
+  },
+  {
+    "id": "scenario-004",
+    "name": "Order Service Error Spike",
+    "anomaly": {
+      "service": "order-service",
+      "type": "error_spike"
+    },
+    "expected": {
+      "root_cause": "order-service",
+      "affected_services": ["order-service"],
+      "relevant_runbooks": ["RB-005"]
+    },
+    "category": "error"
+  },
+  {
+    "id": "scenario-005",
+    "name": "API Gateway Dependency Latency",
+    "anomaly": {
+      "service": "api-gateway",
+      "type": "latency"
+    },
+    "expected": {
+      "root_cause": "api-gateway",
+      "affected_services": ["api-gateway"],
+      "relevant_runbooks": ["RB-004"]
+    },
+    "category": "latency"
+  }
+]

@@ -6,7 +6,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from api_backend.routes import health, pipeline, graph, anomaly, rag, providers, metrics_stream
+from api_backend.routes import health, pipeline, graph, anomaly, rag, providers, metrics_stream, evaluation
 
 ALLOWED_ORIGINS = os.getenv("CORS_ORIGINS", "http://localhost:3001").split(",")
 
@@ -32,3 +32,4 @@ app.include_router(anomaly.router, prefix="/anomaly", tags=["anomaly"])
 app.include_router(rag.router, prefix="/rag", tags=["rag"])
 app.include_router(providers.router, prefix="/providers", tags=["providers"])
 app.include_router(metrics_stream.router, prefix="/metrics", tags=["metrics"])
+app.include_router(evaluation.router, prefix="/evaluation", tags=["evaluation"])
