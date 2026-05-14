@@ -7,6 +7,7 @@ import { injectAnomaly } from "@/services/anomaly/actions";
 import { unwrap } from "@/services/_shared/safe-action";
 import { ANOMALY_TYPES, SERVICES } from "@/services/anomaly/schema";
 import { healthKeys } from "@/services/health/query-options";
+import { anomalyKeys } from "@/services/anomaly/query-options";
 import type { HealthResponse } from "@/services/health/schema";
 import { toast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
@@ -119,6 +120,7 @@ export function InjectForm({
     },
     onSuccess: (data) => {
       void queryClient.invalidateQueries({ queryKey: healthKeys.all });
+      void queryClient.invalidateQueries({ queryKey: anomalyKeys.status() });
       toast.success(`Injection accepted for ${selectedServiceLabel}.`);
       onInjected({
         id: buildEventId("inject"),

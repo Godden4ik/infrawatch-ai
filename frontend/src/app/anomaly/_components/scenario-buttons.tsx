@@ -5,6 +5,7 @@ import { Flame, Loader2, RotateCcw, Workflow } from "lucide-react";
 import { injectScenario, resetAnomalies } from "@/services/anomaly/actions";
 import { unwrap } from "@/services/_shared/safe-action";
 import { healthKeys } from "@/services/health/query-options";
+import { anomalyKeys } from "@/services/anomaly/query-options";
 import { toast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import {
@@ -52,6 +53,7 @@ export function ScenarioButtons({
     },
     onSuccess: (data) => {
       void queryClient.invalidateQueries({ queryKey: healthKeys.all });
+      void queryClient.invalidateQueries({ queryKey: anomalyKeys.status() });
       toast.success("Cascade scenario accepted.");
 
       const events =
@@ -96,6 +98,7 @@ export function ScenarioButtons({
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: healthKeys.all });
+      void queryClient.invalidateQueries({ queryKey: anomalyKeys.status() });
       toast.success("Reset issued across all services.");
       onReset();
     },

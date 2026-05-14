@@ -24,3 +24,16 @@ export const SERVICES = [
 ] as const;
 
 export const SCENARIOS = ["cascade"] as const;
+
+export const serviceAnomalyStatusSchema = z.object({
+  service: z.string(),
+  anomaly_type: z.string().nullable(),
+  since: z.string().nullable(),
+});
+
+export const anomalyStatusResponseSchema = z.object({
+  services: z.array(serviceAnomalyStatusSchema),
+});
+
+export type ServiceAnomalyStatus = z.infer<typeof serviceAnomalyStatusSchema>;
+export type AnomalyStatusResponse = z.infer<typeof anomalyStatusResponseSchema>;

@@ -4,7 +4,7 @@ import asyncio
 import os
 
 import httpx
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
 router = APIRouter()
@@ -44,7 +44,7 @@ class InjectRequest(BaseModel):
 async def inject_anomaly(req: InjectRequest):
     base_url = SERVICE_URLS.get(req.service)
     if not base_url:
-        return {"error": f"Unknown service: {req.service}"}
+        raise HTTPException(status_code=422, detail=f"Unknown service: {req.service}")
     async with httpx.AsyncClient() as client:
         r = await client.post(
             f"{base_url}/inject",
@@ -58,7 +58,7 @@ async def inject_anomaly(req: InjectRequest):
 async def inject_scenario(scenario: str):
     injections = SCENARIOS.get(scenario)
     if not injections:
-        return {"error": f"Unknown scenario: {scenario}"}
+        raise HTTPException(status_code=422, detail=f"Unknown scenario: {scenario}")
 
     async def _post_injections(client: httpx.AsyncClient, items: list[tuple[str, str]]):
         tasks = [
@@ -89,6 +89,40 @@ async def inject_scenario(scenario: str):
         "log_seed_results": [r.json() if not isinstance(r, Exception) else str(r) for r in results_malicious],
         "reapplied_results": [r.json() if not isinstance(r, Exception) else str(r) for r in results_reapplied],
     }
+
+
+class ServiceAnomalyStatus(BaseModel):
+    service: str
+    anomaly_type: str | None = None
+    since: str | None = None
+
+
+class AnomalyStatusResponse(BaseModel):
+    services: list[ServiceAnomalyStatus]
+
+
+async def _fetch_state(client: httpx.AsyncClient, service: str, base_url: str) -> ServiceAnomalyStatus:
+    try:
+        r = await client.get(f"{base_url}/state", timeout=3.0)
+        if r.status_code >= 400:
+            return ServiceAnomalyStatus(service=service)
+        data = r.json()
+        return ServiceAnomalyStatus(
+            service=service,
+            anomaly_type=data.get("anomaly_type"),
+            since=data.get("since"),
+        )
+    except Exception:
+        return ServiceAnomalyStatus(service=service)
+
+
+@router.get("/status", response_model=AnomalyStatusResponse)
+async def anomaly_status():
+    async with httpx.AsyncClient() as client:
+        results = await asyncio.gather(
+            *[_fetch_state(client, svc, url) for svc, url in SERVICE_URLS.items()]
+        )
+    return AnomalyStatusResponse(services=list(results))
 
 
 @router.post("/reset")
