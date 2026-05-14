@@ -66,14 +66,20 @@ def _serialize_record(record):
 
 
 @mcp.tool()
-async def run_cypher(query: str, params: str | None = None) -> str:
+async def run_cypher(
+    query: str,
+    params: dict | str | None = None,
+) -> str:
     """Execute a Cypher query against the Neo4j infrastructure topology graph.
 
-    `params` is an optional JSON string of query parameters, e.g. '{"name": "redis-cache"}'.
+    `params` accepts either a dict (preferred) or a JSON string,
+    e.g. {"name": "redis-cache"} or '{"name": "redis-cache"}'.
     """
     driver = _make_driver()
-    parsed_params = {}
-    if params:
+    parsed_params: dict = {}
+    if isinstance(params, dict):
+        parsed_params = params
+    elif isinstance(params, str) and params:
         try:
             parsed_params = json.loads(params)
         except json.JSONDecodeError as e:
