@@ -2,8 +2,9 @@
 
 import os
 
-from fastapi import APIRouter, Query
-from neo4j import AsyncGraphDatabase
+from fastapi import APIRouter, HTTPException, Query
+from neo4j import AsyncGraphDatabase, AsyncDriver
+from neo4j.exceptions import AuthError, ServiceUnavailable
 
 router = APIRouter()
 
@@ -11,15 +12,33 @@ NEO4J_URI = os.getenv("NEO4J_URI", "bolt://localhost:7687")
 NEO4J_USER = os.getenv("NEO4J_USER", "neo4j")
 NEO4J_PASSWORD = os.getenv("NEO4J_PASSWORD", "infrawatch")
 
+_driver: AsyncDriver | None = None
+
+
+def _get_driver() -> AsyncDriver:
+    global _driver
+    if _driver is None:
+        _driver = AsyncGraphDatabase.driver(NEO4J_URI, auth=(NEO4J_USER, NEO4J_PASSWORD))
+    return _driver
+
+
+async def close_driver() -> None:
+    global _driver
+    if _driver is not None:
+        await _driver.close()
+        _driver = None
+
 
 async def _run_query(query: str, params: dict | None = None) -> list[dict]:
-    driver = AsyncGraphDatabase.driver(NEO4J_URI, auth=(NEO4J_USER, NEO4J_PASSWORD))
     try:
+        driver = _get_driver()
         async with driver.session() as session:
             result = await session.run(query, params or {})
             return [dict(record) for record in await result.data()]
-    finally:
-        await driver.close()
+    except ServiceUnavailable as exc:
+        raise HTTPException(status_code=503, detail=f"Neo4j unavailable: {exc}") from exc
+    except AuthError as exc:
+        raise HTTPException(status_code=503, detail=f"Neo4j auth failed: {exc}") from exc
 
 
 @router.get("/topology")

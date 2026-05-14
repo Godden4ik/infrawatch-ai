@@ -8,7 +8,7 @@ from datetime import datetime, timezone
 from typing import AsyncGenerator
 
 import httpx
-from fastapi import APIRouter
+from fastapi import APIRouter, Request
 from fastapi.responses import StreamingResponse
 
 router = APIRouter()
@@ -102,29 +102,38 @@ async def _poll_all_metrics(client: httpx.AsyncClient) -> dict[str, dict[str, fl
     return services
 
 
-async def _stream_metrics() -> AsyncGenerator[str, None]:
+async def _stream_metrics(request: Request) -> AsyncGenerator[str, None]:
     """Async generator that continuously polls Prometheus and emits SSE frames."""
     yield "retry: 3000\n\n"
 
     async with httpx.AsyncClient() as client:
         while True:
+            if await request.is_disconnected():
+                logger.debug("Metrics stream client disconnected")
+                break
             try:
                 services = await _poll_all_metrics(client)
                 timestamp = datetime.now(timezone.utc).isoformat()
                 payload = json.dumps({"timestamp": timestamp, "services": services})
                 yield f"event: metrics\ndata: {payload}\n\n"
+            except httpx.HTTPError as exc:
+                logger.warning("Prometheus unavailable: %s", exc)
+                error_payload = json.dumps(
+                    {"error": "prometheus_unavailable", "message": str(exc)}
+                )
+                yield f"event: error\ndata: {error_payload}\n\n"
             except Exception as exc:
                 logger.error("Metrics poll error: %s", exc)
-                error_payload = json.dumps({"error": str(exc)})
+                error_payload = json.dumps({"error": "stream_error", "message": str(exc)})
                 yield f"event: error\ndata: {error_payload}\n\n"
 
             await asyncio.sleep(2)
 
 
 @router.get("/stream")
-async def metrics_stream():
+async def metrics_stream(request: Request):
     return StreamingResponse(
-        _stream_metrics(),
+        _stream_metrics(request),
         media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
     )

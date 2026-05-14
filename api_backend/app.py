@@ -13,7 +13,10 @@ ALLOWED_ORIGINS = os.getenv("CORS_ORIGINS", "http://localhost:3001").split(",")
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    yield
+    try:
+        yield
+    finally:
+        await graph.close_driver()
 
 
 app = FastAPI(title="InfraWatch API", version="0.2.0", lifespan=lifespan)
