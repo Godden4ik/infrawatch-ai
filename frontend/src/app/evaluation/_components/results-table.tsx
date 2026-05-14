@@ -1,12 +1,15 @@
 "use client";
 
 import { motion } from "motion/react";
+import { useMutationState, useQueryClient } from "@tanstack/react-query";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
-import { Network, Layers } from "lucide-react";
+import { AlertCircle, Layers, Network, RotateCcw } from "lucide-react";
 import type { RagResult } from "@/services/rag/schema";
+import { ragKeys } from "@/services/rag/query-options";
 import { cn } from "@/lib/utils";
 
 interface ResultsTableProps {
@@ -167,6 +170,8 @@ function ResultColumn({
   tone,
   items,
   hasGraphContext,
+  error,
+  onRetry,
 }: {
   title: string;
   subtitle: string;
@@ -174,6 +179,8 @@ function ResultColumn({
   tone: "primary" | "muted";
   items: { runbooks: Record<string, unknown>[]; incidents: Record<string, unknown>[] };
   hasGraphContext?: boolean;
+  error?: Error;
+  onRetry?: () => void;
 }) {
   const totalCount = items.runbooks.length + items.incidents.length;
 
@@ -242,7 +249,32 @@ function ResultColumn({
               </div>
             )}
 
-            {totalCount === 0 ? (
+            {totalCount === 0 && error ? (
+              <div className="flex min-h-40 flex-col items-center justify-center gap-3 border border-destructive/40 bg-destructive/10 px-4 py-6 text-center">
+                <AlertCircle className="h-5 w-5 text-destructive" />
+                <div className="space-y-1">
+                  <p className="font-mono text-xs uppercase tracking-[0.16em] text-destructive">
+                    Retrieval failed
+                  </p>
+                  <p className="font-mono text-[11px] text-destructive/80">
+                    {error.message}
+                  </p>
+                </div>
+                {onRetry ? (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={onRetry}
+                    className="h-7 gap-1.5 border-destructive/40 bg-background/40 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                  >
+                    <RotateCcw className="h-3 w-3" />
+                    Retry
+                  </Button>
+                ) : null}
+              </div>
+            ) : null}
+
+            {totalCount === 0 && !error ? (
               <div className="flex min-h-40 items-center justify-center border border-dashed border-border/70 bg-background/30 px-4 text-center font-mono text-xs text-muted-foreground">
                 No evidence retrieved.
               </div>
@@ -255,6 +287,29 @@ function ResultColumn({
 }
 
 export function ResultsTable({ data }: ResultsTableProps) {
+  const queryClient = useQueryClient();
+  const mutationStates = useMutationState({
+    filters: { mutationKey: ragKeys.mutation() },
+    select: (m) => ({
+      status: m.state.status,
+      error: m.state.error as Error | null,
+      variables: m.state.variables as { query: string } | undefined,
+    }),
+  });
+  const latest = mutationStates.at(-1);
+  const error = latest?.status === "error" ? latest.error ?? undefined : undefined;
+  const onRetry = error
+    ? () => {
+        const cache = queryClient.getMutationCache();
+        const mutation = cache
+          .findAll({ mutationKey: ragKeys.mutation() })
+          .at(-1);
+        if (mutation && latest?.variables) {
+          mutation.execute(latest.variables);
+        }
+      }
+    : undefined;
+
   return (
     <motion.div
       initial={{ opacity: 0 }}
@@ -272,6 +327,8 @@ export function ResultsTable({ data }: ResultsTableProps) {
           runbooks: data.graphrag.runbook_results,
           incidents: data.graphrag.incident_results,
         }}
+        error={error}
+        onRetry={onRetry}
       />
       <ResultColumn
         title="Naive RAG"
@@ -282,6 +339,8 @@ export function ResultsTable({ data }: ResultsTableProps) {
           runbooks: data.naive.runbook_results,
           incidents: data.naive.incident_results,
         }}
+        error={error}
+        onRetry={onRetry}
       />
     </motion.div>
   );

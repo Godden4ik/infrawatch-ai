@@ -14,6 +14,8 @@ import {
 import "@xyflow/react/dist/style.css";
 import { topologyQueryOptions } from "@/services/graph/query-options";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Button } from "@/components/ui/button";
+import { AlertTriangle, RefreshCw } from "lucide-react";
 import {
   TopologyEdge,
   type TopologyGraphEdge,
@@ -52,7 +54,8 @@ export function TopologyGraph({
   onNodeClick,
   onPaneClick,
 }: TopologyGraphProps) {
-  const { data, isLoading } = useQuery(topologyQueryOptions);
+  const { data, isPending, isError, error, refetch } =
+    useQuery(topologyQueryOptions);
 
   const nodes: TopologyGraphNode[] = !data
     ? []
@@ -121,8 +124,33 @@ export function TopologyGraph({
     onNodeClick(node.id);
   };
 
-  if (isLoading) {
+  if (isPending) {
     return <Skeleton className="h-full w-full" />;
+  }
+
+  if (isError) {
+    return (
+      <div className="flex h-full w-full items-center justify-center p-4">
+        <div className="flex max-w-md flex-col gap-3 border border-destructive/30 bg-destructive/10 p-4 font-mono text-xs text-destructive">
+          <div className="flex items-center gap-2">
+            <AlertTriangle className="h-4 w-4" />
+            <span className="uppercase tracking-[0.16em]">
+              Failed to load topology
+            </span>
+          </div>
+          <p className="font-sans text-xs leading-relaxed">{error.message}</p>
+          <Button
+            variant="destructive"
+            size="sm"
+            onClick={() => refetch()}
+            className="self-start"
+          >
+            <RefreshCw />
+            Retry
+          </Button>
+        </div>
+      </div>
+    );
   }
 
   return (

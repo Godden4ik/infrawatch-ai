@@ -13,7 +13,7 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
 import { Separator } from "@/components/ui/separator";
-import { FlaskConical, Loader2, Sparkles } from "lucide-react";
+import { FlaskConical, Loader2, RotateCcw, Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const PRESET_QUERIES = [
@@ -27,6 +27,13 @@ interface EvalFormProps {
   onQueryChange: (query: string) => void;
 }
 
+interface EvalVariables {
+  query: string;
+  serviceContext: string;
+  provider: string;
+  model?: string;
+}
+
 export function EvalForm({ onQueryChange }: EvalFormProps) {
   const [query, setQuery] = useState("");
   const [serviceContext, setServiceContext] = useState("");
@@ -37,20 +44,33 @@ export function EvalForm({ onQueryChange }: EvalFormProps) {
   const queryClient = useQueryClient();
 
   const mutation = useMutation({
-    mutationFn: async () => {
+    mutationKey: ragKeys.mutation(),
+    mutationFn: async (vars: EvalVariables) => {
       const result = await evaluateRag(
-        query,
-        serviceContext || undefined,
-        judgeSelection.provider,
-        judgeSelection.model || undefined,
+        vars.query,
+        vars.serviceContext || undefined,
+        vars.provider,
+        vars.model,
       );
       return unwrap(result);
     },
-    onSuccess: (data) => {
-      queryClient.setQueryData(ragKeys.evaluation(query), data);
-      onQueryChange(query);
+    onSuccess: (data, vars) => {
+      queryClient.setQueryData(ragKeys.evaluation(vars.query), data);
+      onQueryChange(vars.query);
     },
   });
+
+  const submit = () =>
+    mutation.mutate({
+      query,
+      serviceContext,
+      provider: judgeSelection.provider,
+      model: judgeSelection.model || undefined,
+    });
+
+  const retry = () => {
+    if (mutation.variables) mutation.mutate(mutation.variables);
+  };
 
   return (
     <Card className="p-0">
@@ -130,7 +150,7 @@ export function EvalForm({ onQueryChange }: EvalFormProps) {
             <span>One query. Same judge. Two retrieval paths.</span>
           </div>
           <Button
-            onClick={() => mutation.mutate()}
+            onClick={submit}
             disabled={mutation.isPending || !query.trim()}
             className="gap-2"
           >
@@ -152,9 +172,19 @@ export function EvalForm({ onQueryChange }: EvalFormProps) {
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            className="border border-destructive/30 bg-destructive/10 px-3 py-2 font-mono text-xs text-destructive"
+            className="flex items-center justify-between gap-3 border border-destructive/30 bg-destructive/10 px-3 py-2 font-mono text-xs text-destructive"
           >
-            {mutation.error.message}
+            <span className="truncate">{mutation.error.message}</span>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={retry}
+              disabled={!mutation.variables || mutation.isPending}
+              className="h-7 shrink-0 gap-1.5 border-destructive/40 bg-background/40 text-destructive hover:bg-destructive/10 hover:text-destructive"
+            >
+              <RotateCcw className="h-3 w-3" />
+              Retry
+            </Button>
           </motion.div>
         )}
       </CardContent>

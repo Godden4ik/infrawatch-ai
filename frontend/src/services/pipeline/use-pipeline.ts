@@ -5,6 +5,7 @@ import { apiClientStream } from "@/services/_shared/fetch-client";
 import { pipelineKeys } from "./query-options";
 import {
   normalizeAgentName,
+  type PipelineRunParams,
   type PipelineState,
   type StreamEvent,
 } from "./schema";
@@ -89,11 +90,8 @@ export function usePipelineStream() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (params: {
-      llmProvider?: string;
-      llmModel?: string;
-      apiKey?: string;
-    }) => {
+    mutationFn: async (params: PipelineRunParams) => {
+      queryClient.setQueryData(pipelineKeys.lastParams(), params);
       queryClient.setQueryData(pipelineKeys.currentRun(), INITIAL_STATE);
 
       const res = await apiClientStream("/api/pipeline/run", {
@@ -109,6 +107,7 @@ export function usePipelineStream() {
       const reader = res.body!.getReader();
       const decoder = new TextDecoder();
       let buffer = "";
+      let terminated = false;
 
       while (true) {
         const { done, value } = await reader.read();
@@ -123,6 +122,9 @@ export function usePipelineStream() {
           const json = line.slice(6);
           try {
             const event = JSON.parse(json) as StreamEvent;
+            if (event.type === "done" || event.type === "error") {
+              terminated = true;
+            }
             queryClient.setQueryData(
               pipelineKeys.currentRun(),
               (old: PipelineState | undefined) =>
@@ -132,6 +134,10 @@ export function usePipelineStream() {
             // skip malformed events
           }
         }
+      }
+
+      if (!terminated) {
+        throw new Error("Stream disconnected before completion");
       }
     },
     onError: (error) => {

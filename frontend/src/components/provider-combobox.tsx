@@ -15,15 +15,19 @@ import {
 } from "@/components/ui/select";
 import { Loader2 } from "lucide-react";
 
+export type ProviderListStatus = "loading" | "empty" | "ready" | "error";
+
 interface ProviderComboboxProps {
   value: ProviderSelection;
   onChange: (value: ProviderSelection) => void;
+  onStatusChange?: (status: ProviderListStatus) => void;
   label?: string;
 }
 
 export function ProviderCombobox({
   value,
   onChange,
+  onStatusChange,
   label = "Execution Provider",
 }: ProviderComboboxProps) {
   const [providers, setProviders] = useState<Provider[]>([]);
@@ -60,6 +64,19 @@ export function ProviderCombobox({
       cancelled = true;
     };
   }, []);
+
+  useEffect(() => {
+    if (!onStatusChange) return;
+    if (isLoading) {
+      onStatusChange("loading");
+    } else if (error) {
+      onStatusChange("error");
+    } else if (providers.length === 0) {
+      onStatusChange("empty");
+    } else {
+      onStatusChange("ready");
+    }
+  }, [isLoading, error, providers.length, onStatusChange]);
 
   const activeProvider = providers.find((provider) => provider.id === value.provider);
 

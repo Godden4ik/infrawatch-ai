@@ -112,6 +112,7 @@ export function ComparisonChart({ data }: ComparisonChartProps) {
   const graphContextCount =
     graphMetrics?.context_richness ??
     (data.graphrag.service_context ? Object.keys(data.graphrag.service_context).length : 0);
+  const naiveContextCount = naiveMetrics?.context_richness ?? 0;
   const graphJudgeRelevance = graphMetrics?.llm_content_relevance ?? 0;
   const naiveJudgeRelevance = naiveMetrics?.llm_content_relevance ?? 0;
   const graphJudgeActionability = graphMetrics?.llm_actionability ?? 0;
@@ -172,7 +173,7 @@ export function ComparisonChart({ data }: ComparisonChartProps) {
           <MetricCard
             label="Graph Context"
             graphrag={graphContextCount}
-            naive={0}
+            naive={naiveContextCount}
             icon={Network}
             delay={0.24}
             hint="attached context keys"
