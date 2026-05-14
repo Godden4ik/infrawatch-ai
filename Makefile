@@ -1,5 +1,10 @@
 .PHONY: help dev demo stop down seed ingest bootstrap bootstrap-once wait-neo4j reset logs ps fe-install fe-dev fe-build fe-typecheck fe-lint test test-unit test-integration test-e2e
 
+NEO4J_URI ?= bolt://localhost:7687
+NEO4J_USER ?= neo4j
+NEO4J_PASSWORD ?= infrawatch
+export NEO4J_URI NEO4J_USER NEO4J_PASSWORD
+
 help:
 	@echo "Targets:"
 	@echo "  dev              Start backend stack (no frontend container) + pnpm dev on host"
@@ -30,9 +35,9 @@ dev:
 	cd frontend && pnpm dev
 
 wait-neo4j:
-	@echo ">> waiting for neo4j on bolt://localhost:7687..."
+	@echo ">> waiting for neo4j on $(NEO4J_URI)..."
 	@for i in $$(seq 1 60); do \
-	  if python3 -c "from neo4j import GraphDatabase; GraphDatabase.driver('bolt://localhost:7687', auth=('neo4j','infrawatch')).verify_connectivity()" 2>/dev/null; then \
+	  if python3 -c "import os; from neo4j import GraphDatabase; GraphDatabase.driver(os.environ['NEO4J_URI'], auth=(os.environ['NEO4J_USER'], os.environ['NEO4J_PASSWORD'])).verify_connectivity()" 2>/dev/null; then \
 	    echo ">> neo4j ready"; exit 0; \
 	  fi; \
 	  sleep 2; \
@@ -40,7 +45,7 @@ wait-neo4j:
 	echo ">> neo4j failed to start within 120s"; exit 1
 
 bootstrap-once:
-	@count=$$(python3 -c "from neo4j import GraphDatabase; d=GraphDatabase.driver('bolt://localhost:7687', auth=('neo4j','infrawatch')); s=d.session(); print(s.run('MATCH (r:Runbook) RETURN count(r) AS c').single()['c']); d.close()" 2>/dev/null || echo 0); \
+	@count=$$(python3 -c "import os; from neo4j import GraphDatabase; d=GraphDatabase.driver(os.environ['NEO4J_URI'], auth=(os.environ['NEO4J_USER'], os.environ['NEO4J_PASSWORD'])); s=d.session(); print(s.run('MATCH (r:Runbook) RETURN count(r) AS c').single()['c']); d.close()" 2>/dev/null || echo 0); \
 	if [ "$$count" = "0" ]; then \
 	  echo ">> empty graph, seeding + ingesting"; \
 	  $(MAKE) seed; \
