@@ -1,14 +1,27 @@
 "use client";
 
-import { useId } from "react";
+import { useId, useMemo } from "react";
+import { useTheme } from "next-themes";
 import type { MetricPoint } from "@/services/metrics/schema";
 
 interface MetricChartProps {
   title: string;
   data: MetricPoint[];
-  color: string;
-  areaColor: string;
+  /** CSS variable name for line/dot color, e.g. "--status-healthy". */
+  colorVar: string;
+  /** CSS variable name for area/gradient base, e.g. "--status-healthy-soft". */
+  areaVar: string;
   formatValue: (value: number) => string;
+}
+
+// Duplicated locally — kept in sync with live-chart.tsx but intentionally not
+// imported (live-chart.tsx has a fragile fix we don't want to couple to).
+function cssVar(name: string): string {
+  if (typeof window === "undefined") return "#888";
+  const raw = getComputedStyle(document.documentElement)
+    .getPropertyValue(name)
+    .trim();
+  return raw || "#888";
 }
 
 const CHART_WIDTH = 280;
@@ -65,10 +78,17 @@ function buildSparkline(data: MetricPoint[]) {
 export function MetricChart({
   title,
   data,
-  color,
-  areaColor,
+  colorVar,
+  areaVar,
   formatValue,
 }: MetricChartProps) {
+  const { resolvedTheme } = useTheme();
+  const isDark = resolvedTheme === "dark";
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- isDark forces re-resolve when theme flips
+  const color = useMemo(() => cssVar(colorVar), [colorVar, isDark]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- isDark forces re-resolve when theme flips
+  const areaColor = useMemo(() => cssVar(areaVar), [areaVar, isDark]);
+
   const gradientId = useId().replace(/:/g, "");
   const safeData = sanitizeMetricData(data);
   const sparkline = buildSparkline(safeData);

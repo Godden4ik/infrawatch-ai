@@ -51,10 +51,15 @@ export function evaluateMetric(
   return "healthy";
 }
 
-export const LEVEL_COLORS: Record<HealthLevel, { color: string; areaColor: string }> = {
-  healthy: { color: "#4ade80", areaColor: "rgba(74, 222, 128, 0.18)" },
-  warn: { color: "#facc15", areaColor: "rgba(250, 204, 21, 0.22)" },
-  critical: { color: "#f87171", areaColor: "rgba(248, 113, 113, 0.24)" },
+// CSS variable names. Resolved at render time in chart components (SVG attrs
+// don't accept var()). Use the helper in metric-chart.tsx for resolution.
+export const LEVEL_COLORS: Record<
+  HealthLevel,
+  { colorVar: string; areaVar: string }
+> = {
+  healthy: { colorVar: "--status-healthy", areaVar: "--status-healthy-soft" },
+  warn: { colorVar: "--status-degraded", areaVar: "--status-degraded-soft" },
+  critical: { colorVar: "--status-critical", areaVar: "--status-critical-soft" },
 };
 
 export const LEVEL_BADGE: Record<

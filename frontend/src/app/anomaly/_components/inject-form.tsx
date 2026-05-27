@@ -28,7 +28,7 @@ import {
   SelectLabel,
   SelectTrigger,
 } from "@/components/ui/select";
-import { cn } from "@/lib/utils";
+import { StatusDot, type StatusVariant } from "@/components/ui/status-indicator";
 import type { ActiveInjection, InjectResponse } from "./types";
 
 const ANOMALY_COPY: Record<
@@ -74,10 +74,12 @@ function buildEventId(prefix: string) {
   return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
-function statusDot(status: HealthResponse["services"][string] | undefined) {
-  if (status === "healthy") return "bg-status-healthy";
-  if (status === "unhealthy") return "bg-status-degraded";
-  return "bg-muted-foreground";
+function statusVariant(
+  status: HealthResponse["services"][string] | undefined,
+): StatusVariant {
+  if (status === "healthy") return "healthy";
+  if (status === "unhealthy") return "degraded";
+  return "unknown";
 }
 
 function statusLabel(status: HealthResponse["services"][string] | undefined) {
@@ -180,11 +182,9 @@ export function InjectForm({
                           {SERVICE_LABELS[entry] ?? entry}
                         </span>
                         <span className="flex items-center gap-1.5 text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
-                          <span
-                            className={cn(
-                              "h-1.5 w-1.5 shrink-0 rounded-full",
-                              statusDot(serviceStatuses?.[entry]),
-                            )}
+                          <StatusDot
+                            variant={statusVariant(serviceStatuses?.[entry])}
+                            className="shrink-0"
                           />
                           {statusLabel(serviceStatuses?.[entry])}
                         </span>
@@ -246,9 +246,7 @@ export function InjectForm({
               <div className="bg-background/60 px-2 py-2 ring-1 ring-inset ring-border/60">
                 Service state
                 <div className="mt-1 flex items-center gap-1.5 text-foreground">
-                  <span
-                    className={cn("h-1.5 w-1.5 rounded-full", statusDot(selectedStatus))}
-                  />
+                  <StatusDot variant={statusVariant(selectedStatus)} />
                   {statusLabel(selectedStatus)}
                 </div>
               </div>

@@ -35,18 +35,17 @@ export function LiveChart({ label, points, colorVar, format }: LiveChartProps) {
   const minValue = points.length > 0 ? Math.min(...points.map((p) => p.value)) : null;
   const maxValue = points.length > 0 ? Math.max(...points.map((p) => p.value)) : null;
 
-  const nivoData = useMemo(
-    () => [
-      {
-        id: label,
-        data: points.map((p) => ({
-          x: new Date(p.time),
-          y: p.value,
-        })),
-      },
-    ],
-    [label, points],
-  );
+  const nivoData = useMemo(() => {
+    const seen = new Set<number>();
+    const deduped: { x: number; y: number }[] = [];
+    for (const p of points) {
+      const t = new Date(p.time).getTime();
+      if (!Number.isFinite(t) || seen.has(t)) continue;
+      seen.add(t);
+      deduped.push({ x: t, y: p.value });
+    }
+    return [{ id: label, data: deduped }];
+  }, [label, points]);
 
   const nivoTheme = useMemo(
     () => ({
@@ -83,13 +82,16 @@ export function LiveChart({ label, points, colorVar, format }: LiveChartProps) {
             <ResponsiveLine
               data={nivoData}
               margin={{ top: 4, right: 8, bottom: 24, left: 40 }}
-              xScale={{ type: "time" }}
+              xScale={{ type: "linear", min: "auto", max: "auto" }}
               yScale={{ type: "linear", min: "auto", max: "auto" }}
               axisBottom={{
                 tickSize: 0,
                 tickPadding: 6,
-                format: "%H:%M:%S",
                 tickValues: 4,
+                format: (v) => {
+                  const d = new Date(Number(v));
+                  return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}:${String(d.getSeconds()).padStart(2, "0")}`;
+                },
               }}
               axisLeft={{
                 tickSize: 0,
@@ -107,13 +109,7 @@ export function LiveChart({ label, points, colorVar, format }: LiveChartProps) {
               animate={false}
               theme={nivoTheme}
               enableCrosshair
-              isInteractive
-              useMesh
-              tooltip={({ point }) => (
-                <div className="border-border bg-popover px-2 py-1 font-mono text-[11px] text-popover-foreground shadow-md">
-                  {formatMetricValue(Number(point.data.y), format)}
-                </div>
-              )}
+              isInteractive={false}
             />
           ) : (
             <div className="flex h-full items-center justify-center">

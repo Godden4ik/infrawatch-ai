@@ -11,16 +11,44 @@ export interface MetricDef {
 export interface ServiceMetricGroup {
   service: string;
   label: string;
-  /** CSS variable name for chart color, e.g. "--chart-1" */
+  /**
+   * CSS variable name for the group-level fallback chart color, e.g. `--brand`.
+   * Per-metric color is derived via `getMetricColorVar(metric)` and should be
+   * preferred where possible.
+   */
   colorVar: string;
   metrics: MetricDef[];
+}
+
+/**
+ * Maps a metric to a semantic CSS variable for chart color. Error/failure
+ * signals always get the error token; otherwise we route by format:
+ * latencies → latency, rates/counts/bytes → rate, ratios/currency → success.
+ */
+export function getMetricColorVar(metric: MetricDef): string {
+  const k = metric.key.toLowerCase();
+  if (k.includes("error") || k.includes("failure") || k.includes("evict")) {
+    return "--metric-error";
+  }
+  switch (metric.format) {
+    case "latency":
+      return "--metric-latency";
+    case "ratio":
+    case "currency":
+      return "--metric-success";
+    case "rate":
+    case "count":
+    case "bytes":
+    default:
+      return "--metric-rate";
+  }
 }
 
 export const METRIC_GROUPS: ServiceMetricGroup[] = [
   {
     service: "api-gateway",
     label: "API Gateway",
-    colorVar: "--chart-1",
+    colorVar: "--brand",
     metrics: [
       { key: "p95_latency", label: "P95 Latency", format: "latency" },
       { key: "request_rate", label: "Request Rate", format: "rate" },
@@ -31,7 +59,7 @@ export const METRIC_GROUPS: ServiceMetricGroup[] = [
   {
     service: "payment-service",
     label: "Payment Service",
-    colorVar: "--chart-2",
+    colorVar: "--brand",
     metrics: [
       { key: "p95_latency", label: "P95 Latency", format: "latency" },
       { key: "transaction_rate", label: "Transaction Rate", format: "rate" },
@@ -43,7 +71,7 @@ export const METRIC_GROUPS: ServiceMetricGroup[] = [
   {
     service: "user-service",
     label: "User Service",
-    colorVar: "--chart-3",
+    colorVar: "--brand",
     metrics: [
       { key: "p95_latency", label: "P95 Latency", format: "latency" },
       { key: "auth_rate", label: "Auth Rate", format: "rate" },
@@ -55,7 +83,7 @@ export const METRIC_GROUPS: ServiceMetricGroup[] = [
   {
     service: "order-service",
     label: "Order Service",
-    colorVar: "--chart-4",
+    colorVar: "--brand",
     metrics: [
       { key: "p95_latency", label: "P95 Latency", format: "latency" },
       { key: "order_rate", label: "Order Rate", format: "rate" },
@@ -66,7 +94,7 @@ export const METRIC_GROUPS: ServiceMetricGroup[] = [
   {
     service: "redis-cache",
     label: "Redis Cache",
-    colorVar: "--chart-5",
+    colorVar: "--brand",
     metrics: [
       { key: "hit_ratio", label: "Hit Ratio", format: "ratio" },
       { key: "hits_rate", label: "Hits/s", format: "rate" },

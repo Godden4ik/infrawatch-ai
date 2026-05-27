@@ -16,6 +16,7 @@ import { toast } from "@/hooks/use-toast";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { StatusDot, StatusPill } from "@/components/ui/status-indicator";
 import {
   InputGroup,
   InputGroupAddon,
@@ -49,24 +50,16 @@ function getConnectionFailureMessage(error: string | undefined) {
 
 function StatusBadge({ configured, requiresKey }: { configured: boolean; requiresKey: boolean }) {
   if (configured) {
-    return (
-      <Badge className="bg-status-healthy-soft text-status-healthy border-transparent text-[10px] font-medium uppercase tracking-wider">
-        Configured
-      </Badge>
-    );
+    return <StatusPill variant="healthy">Configured</StatusPill>;
   }
   if (!requiresKey) {
     return (
-      <Badge className="bg-brand-soft text-brand border-transparent text-[10px] font-medium uppercase tracking-wider">
+      <Badge className="border-transparent bg-brand-soft text-brand text-[10px] font-medium uppercase tracking-wider">
         Local
       </Badge>
     );
   }
-  return (
-    <Badge variant="secondary" className="text-[10px] font-medium uppercase tracking-wider">
-      No Key
-    </Badge>
-  );
+  return <StatusPill variant="degraded">No Key</StatusPill>;
 }
 
 // ─── Health result inline display ─────────────────────────────────────────────
@@ -85,18 +78,23 @@ function HealthResult({
 
   if (result.status === "healthy") {
     return (
-      <span className="font-mono text-[10px] text-status-healthy">
-        {result.latency_ms}ms
+      <span className="inline-flex items-center gap-1.5 font-mono text-[10px] text-muted-foreground">
+        <StatusDot variant="healthy" />
+        <span className="text-foreground">{result.latency_ms}ms</span>
       </span>
     );
   }
   if (result.status === "no_key") {
     return (
-      <span className="font-mono text-[10px] text-status-degraded">no key set</span>
+      <span className="inline-flex items-center gap-1.5 font-mono text-[10px] text-muted-foreground">
+        <StatusDot variant="degraded" />
+        no key set
+      </span>
     );
   }
   return (
-    <span className="font-mono text-[10px] text-destructive">
+    <span className="inline-flex items-center gap-1.5 font-mono text-[10px] text-muted-foreground">
+      <StatusDot variant="critical" />
       {getConnectionFailureMessage(result.error)}
     </span>
   );

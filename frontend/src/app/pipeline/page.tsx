@@ -33,6 +33,7 @@ import {
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { StatusPill, type StatusVariant } from "@/components/ui/status-indicator";
 import { PageHeader, PageMetaCell } from "@/components/layout/page-header";
 import { cn } from "@/lib/utils";
 import { PipelineControls } from "./_components/pipeline-controls";
@@ -144,17 +145,27 @@ function getStageSummary(state: PipelineState | undefined) {
   };
 }
 
-function statusBadgeVariant(status: PipelineState["status"] | undefined) {
-  if (status === "running") return "default";
-  if (status === "complete") return "outline";
-  if (status === "error") return "destructive";
-  return "outline";
+function pipelineStatusVariant(
+  status: PipelineState["status"] | undefined,
+): StatusVariant {
+  if (status === "running") return "degraded";
+  if (status === "complete") return "healthy";
+  if (status === "error") return "critical";
+  return "unknown";
+}
+
+function stageStatusVariant(
+  state: "complete" | "running" | "standby",
+): StatusVariant {
+  if (state === "complete") return "healthy";
+  if (state === "running") return "degraded";
+  return "unknown";
 }
 
 function statusTone(status: PipelineState["status"] | undefined) {
-  if (status === "running") return "text-primary";
-  if (status === "complete") return "text-success";
-  if (status === "error") return "text-destructive";
+  if (status === "running") return "text-status-degraded";
+  if (status === "complete") return "text-status-healthy";
+  if (status === "error") return "text-status-critical";
   return "text-muted-foreground";
 }
 
@@ -195,16 +206,12 @@ function ProgressRail({ state }: { state: PipelineState | undefined }) {
           Monitor verifies signal. Analyst narrows topology. Responder drafts action.
         </CardDescription>
         <CardAction>
-          <Badge
-            variant={statusBadgeVariant(state?.status)}
-            className={cn(
-              "font-mono text-[10px] uppercase tracking-[0.14em]",
-              state?.status === "running" && "bg-primary/10 text-primary",
-              state?.status === "complete" && "text-success",
-            )}
+          <StatusPill
+            variant={pipelineStatusVariant(state?.status)}
+            pulse={state?.status === "running"}
           >
             {state?.status ?? "idle"}
-          </Badge>
+          </StatusPill>
         </CardAction>
       </CardHeader>
 
@@ -259,15 +266,18 @@ function ProgressRail({ state }: { state: PipelineState | undefined }) {
                   </div>
 
                   <div className="flex items-center justify-between">
-                    <span
-                      className={cn(
-                        "font-mono text-[10px] uppercase tracking-[0.14em] text-muted-foreground",
-                        complete && "text-success",
-                        running && step.accent,
-                      )}
-                    >
-                      {complete ? "complete" : running ? "running" : "standby"}
-                    </span>
+                    {(() => {
+                      const stageState: "complete" | "running" | "standby" =
+                        complete ? "complete" : running ? "running" : "standby";
+                      return (
+                        <StatusPill
+                          variant={stageStatusVariant(stageState)}
+                          pulse={!!running}
+                        >
+                          {stageState}
+                        </StatusPill>
+                      );
+                    })()}
                     {running ? (
                       <motion.span
                         className={cn("h-1.5 w-1.5", step.marker)}

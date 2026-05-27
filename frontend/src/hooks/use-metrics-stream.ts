@@ -55,6 +55,11 @@ function pushEvent(timestamp: string, services: Record<string, Record<string, nu
         next.services[service][key] = existing;
         continue;
       }
+      const last = existing[existing.length - 1];
+      if (last && last.time === timestamp) {
+        next.services[service][key] = existing;
+        continue;
+      }
       const point: StreamPoint = { time: timestamp, value };
       const updated = [...existing, point];
       if (updated.length > MAX_BUFFER_SIZE) {

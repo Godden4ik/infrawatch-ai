@@ -162,8 +162,8 @@ export function ServiceMetrics({ serviceName, streamData }: ServiceMetricsProps)
               <MetricChart
                 title={metric.title}
                 data={streamData[metric.streamKey] ?? []}
-                color={palette.color}
-                areaColor={palette.areaColor}
+                colorVar={palette.colorVar}
+                areaVar={palette.areaVar}
                 formatValue={metric.formatValue}
               />
             </motion.div>

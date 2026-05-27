@@ -14,6 +14,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { StatusPill, type StatusVariant } from "@/components/ui/status-indicator";
 import {
   Table,
   TableBody,
@@ -25,8 +26,8 @@ import {
 
 const CRITICAL_TYPES = new Set(["cache_failure", "memory_leak"]);
 
-function severityVariant(type: string): "destructive" | "secondary" {
-  return CRITICAL_TYPES.has(type) ? "destructive" : "secondary";
+function severityVariant(type: string): StatusVariant {
+  return CRITICAL_TYPES.has(type) ? "critical" : "degraded";
 }
 
 function formatAnomalyLabel(value: string) {
@@ -118,19 +119,11 @@ export function LiveStatusPanel() {
                     </TableCell>
                     <TableCell>
                       {anomalyType ? (
-                        <Badge
-                          variant={severityVariant(anomalyType)}
-                          className="font-mono text-[10px] uppercase"
-                        >
+                        <StatusPill variant={severityVariant(anomalyType)}>
                           {formatAnomalyLabel(anomalyType)}
-                        </Badge>
+                        </StatusPill>
                       ) : (
-                        <Badge
-                          variant="outline"
-                          className="font-mono text-[10px] uppercase text-muted-foreground"
-                        >
-                          healthy
-                        </Badge>
+                        <StatusPill variant="healthy">healthy</StatusPill>
                       )}
                     </TableCell>
                     <TableCell className="font-mono text-[11px] text-muted-foreground">
