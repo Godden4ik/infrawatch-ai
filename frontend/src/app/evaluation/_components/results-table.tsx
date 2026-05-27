@@ -121,13 +121,13 @@ function ResultItem({
               className={cn(
                 "shrink-0 font-mono text-[10px] uppercase tracking-[0.16em]",
                 severity === "critical" &&
-                  "border-destructive/30 bg-destructive/10 text-destructive",
+                  "border-status-critical/30 bg-status-critical-soft text-status-critical",
                 severity === "high" &&
-                  "border-[color:var(--color-warning)]/30 bg-[color:var(--color-warning)]/10 text-[color:var(--color-warning)]",
+                  "border-status-degraded/30 bg-status-degraded-soft text-status-degraded",
                 severity === "medium" &&
-                  "border-primary/30 bg-primary/10 text-primary",
+                  "border-brand/30 bg-brand-soft text-brand",
                 severity === "low" &&
-                  "border-[color:var(--color-success)]/30 bg-[color:var(--color-success)]/10 text-[color:var(--color-success)]",
+                  "border-status-healthy/30 bg-status-healthy-soft text-status-healthy",
               )}
             >
               {severity}
@@ -151,7 +151,7 @@ function ResultItem({
           {graphContext.map(([key, val]) => (
             <span
               key={key}
-              className="inline-flex items-center gap-1 border border-primary/20 bg-primary/10 px-2 py-1 font-mono text-[11px] text-primary"
+              className="inline-flex items-center gap-1 border border-brand/20 bg-brand-soft px-2 py-1 font-mono text-[11px] text-brand"
             >
               <Network className="h-3 w-3" />
               {key}: {Array.isArray(val) ? val.join(", ") : JSON.stringify(val)}
@@ -166,6 +166,7 @@ function ResultItem({
 function ResultColumn({
   title,
   subtitle,
+  eyebrow,
   icon: Icon,
   tone,
   items,
@@ -175,8 +176,9 @@ function ResultColumn({
 }: {
   title: string;
   subtitle: string;
+  eyebrow: string;
   icon: React.ElementType;
-  tone: "primary" | "muted";
+  tone: "brand" | "muted";
   items: { runbooks: Record<string, unknown>[]; incidents: Record<string, unknown>[] };
   hasGraphContext?: boolean;
   error?: Error;
@@ -185,22 +187,30 @@ function ResultColumn({
   const totalCount = items.runbooks.length + items.incidents.length;
 
   return (
-    <Card className="min-h-[620px] p-0">
+    <Card tone={tone === "brand" ? "brand" : "default"} className="min-h-[620px] p-0">
       <CardContent className="border-b border-border/60 p-4">
         <div className="flex items-start justify-between gap-3">
           <div className="flex items-center gap-3">
             <div
               className={cn(
                 "flex h-8 w-8 items-center justify-center ring-1 ring-inset",
-                tone === "primary"
-                  ? "bg-primary/10 text-primary ring-primary/20"
+                tone === "brand"
+                  ? "bg-brand-soft text-brand ring-brand/20"
                   : "bg-muted/60 text-muted-foreground ring-border",
               )}
             >
               <Icon className="h-4 w-4" />
             </div>
-            <div>
-              <h3 className="text-base font-semibold">{title}</h3>
+            <div
+              className={cn(
+                "space-y-0.5",
+                tone === "brand" && "border-l-2 border-brand pl-3",
+              )}
+            >
+              <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-muted-foreground/80">
+                {eyebrow}
+              </p>
+              <h3 className="text-base font-semibold leading-tight">{title}</h3>
               <p className="text-xs text-muted-foreground">{subtitle}</p>
             </div>
           </div>
@@ -320,8 +330,9 @@ export function ResultsTable({ data }: ResultsTableProps) {
       <ResultColumn
         title="GraphRAG"
         subtitle="Topology-aware retrieval"
+        eyebrow="GRAPHRAG"
         icon={Network}
-        tone="primary"
+        tone="brand"
         hasGraphContext
         items={{
           runbooks: data.graphrag.runbook_results,
@@ -333,6 +344,7 @@ export function ResultsTable({ data }: ResultsTableProps) {
       <ResultColumn
         title="Naive RAG"
         subtitle="Embedding-only retrieval"
+        eyebrow="NAIVE"
         icon={Layers}
         tone="muted"
         items={{

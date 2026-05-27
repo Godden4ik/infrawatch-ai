@@ -15,6 +15,7 @@ import "@xyflow/react/dist/style.css";
 import { topologyQueryOptions } from "@/services/graph/query-options";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
+import { StatusPill } from "@/components/ui/status-indicator";
 import { AlertTriangle, RefreshCw } from "lucide-react";
 import {
   TopologyEdge,
@@ -172,14 +173,16 @@ export function TopologyGraph({
         }
 
         .topology-edge-path--selected {
-          stroke: var(--primary);
+          stroke: var(--brand);
           stroke-opacity: 0.9;
+          stroke-width: 2;
           animation-duration: 8s;
         }
 
         .topology-edge-path--affected {
-          stroke: var(--destructive);
-          stroke-opacity: 0.72;
+          stroke: var(--status-critical);
+          stroke-opacity: 0.78;
+          stroke-width: 2;
           animation-duration: 6s;
         }
 
@@ -239,6 +242,11 @@ export function TopologyGraph({
             </span>
           </div>
         </div>
+        {affectedServices.length > 0 ? (
+          <StatusPill variant="critical">
+            {affectedServices.length} services affected
+          </StatusPill>
+        ) : null}
       </div>
 
       <ReactFlow<TopologyGraphNode, TopologyGraphEdge>

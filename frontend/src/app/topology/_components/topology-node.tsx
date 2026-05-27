@@ -22,9 +22,9 @@ export function TopologyNode({ data }: NodeProps) {
       className={cn(
         "relative min-w-[220px] border bg-card px-4 py-3 shadow-[0_12px_30px_rgba(0,0,0,0.22)] transition-colors",
         nodeData.selected
-          ? "border-brand/70 text-foreground"
+          ? "border-brand text-foreground ring-1 ring-brand/30"
           : nodeData.affected
-            ? "border-status-critical/50 text-foreground"
+            ? "border-status-critical/70 bg-status-critical-soft/40 text-foreground"
             : "border-border text-foreground",
       )}
       style={{ viewTransitionName: `node-${nodeData.name}` }}
@@ -35,7 +35,7 @@ export function TopologyNode({ data }: NodeProps) {
           nodeData.selected
             ? "bg-brand"
             : nodeData.affected
-              ? "bg-status-critical/70"
+              ? "bg-status-critical/80"
               : "bg-border/80",
         )}
       />

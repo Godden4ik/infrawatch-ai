@@ -5,42 +5,57 @@ import { AlertCircle, CheckCircle2, Info, X } from "lucide-react";
 import { useToasts, removeToast, type Toast, type ToastVariant } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 
-const variantConfig: Record<
-  ToastVariant,
-  { icon: React.ReactNode; className: string }
-> = {
+type ToastVariantConfig = {
+  icon: React.ReactNode;
+  className: string;
+  eyebrow: string;
+};
+
+const variantConfig: Record<ToastVariant, ToastVariantConfig> = {
   success: {
     icon: <CheckCircle2 className="size-4 shrink-0" />,
-    className:
-      "border-status-healthy/30 bg-status-healthy-soft/80 text-status-healthy",
+    className: "border-status-healthy/30 bg-status-healthy-soft text-status-healthy",
+    eyebrow: "Success",
   },
   error: {
     icon: <AlertCircle className="size-4 shrink-0" />,
-    className: "border-status-critical/30 bg-status-critical-soft/80 text-status-critical",
+    className: "border-status-critical/30 bg-status-critical-soft text-status-critical",
+    eyebrow: "Error",
   },
   info: {
     icon: <Info className="size-4 shrink-0" />,
-    className: "border-brand/30 bg-brand-soft/80 text-brand",
+    className: "border-brand/30 bg-brand-soft text-brand",
+    eyebrow: "Info",
   },
 };
 
 function ToastItem({ toast }: { toast: Toast }) {
-  const { icon, className } = variantConfig[toast.variant];
+  const config = variantConfig[toast.variant] ?? {
+    icon: <Info className="size-4 shrink-0" />,
+    className: "border-border bg-card text-foreground",
+    eyebrow: "Notice",
+  };
+  const { icon, className, eyebrow } = config;
 
   return (
     <motion.div
       layout
-      initial={{ opacity: 0, y: 24, scale: 0.95 }}
-      animate={{ opacity: 1, y: 0, scale: 1 }}
-      exit={{ opacity: 0, y: -8, scale: 0.95 }}
-      transition={{ duration: 0.2, ease: "easeOut" }}
+      initial={{ opacity: 0, y: 12 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: -4 }}
+      transition={{ duration: 0.15, ease: "easeOut" }}
       className={cn(
-        "flex w-80 items-start gap-3 rounded-lg border px-4 py-3 shadow-lg backdrop-blur-sm",
+        "flex w-80 items-start gap-3 rounded-sm border px-3 py-2.5",
         className,
       )}
     >
       <span className="mt-0.5">{icon}</span>
-      <p className="flex-1 text-sm leading-snug">{toast.message}</p>
+      <div className="flex flex-1 flex-col gap-0.5">
+        <span className="font-mono text-[10px] uppercase tracking-wider opacity-70">
+          {eyebrow}
+        </span>
+        <p className="text-sm leading-snug text-foreground">{toast.message}</p>
+      </div>
       <button
         onClick={() => removeToast(toast.id)}
         className="mt-0.5 shrink-0 opacity-60 transition-opacity hover:opacity-100"

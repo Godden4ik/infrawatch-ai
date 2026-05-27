@@ -59,9 +59,9 @@ export function TopologyEdge({
       : sourceY + 22 + lane * 14;
 
   const arrowColor = edgeData?.selected
-    ? "var(--primary)"
+    ? "var(--brand)"
     : edgeData?.affected
-      ? "var(--destructive)"
+      ? "var(--status-critical)"
       : "var(--muted-foreground)";
   const arrowPath = `M ${targetX - 5} ${targetY - 8} L ${targetX} ${targetY - 1} L ${targetX + 5} ${targetY - 8} Z`;
 
