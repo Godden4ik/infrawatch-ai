@@ -2,6 +2,10 @@
 
 import { serverFetch, apiBackendUrl } from "@/services/_shared/fetch-server";
 import { safeAction } from "@/services/_shared/safe-action";
+import {
+  anomalyStatusResponseSchema,
+  type AnomalyStatusResponse,
+} from "./schema";
 
 export async function injectAnomaly(service: string, anomalyType: string) {
   return safeAction(
@@ -22,6 +26,16 @@ export async function injectScenario(scenario: string) {
         method: "POST",
       }),
     { code: "SCENARIO_INJECT_FAILED", message: "Failed to inject scenario" },
+  );
+}
+
+export async function getStatus() {
+  return safeAction(
+    async () => {
+      const raw = await serverFetch<unknown>(apiBackendUrl, "/anomaly/status");
+      return anomalyStatusResponseSchema.parse(raw) satisfies AnomalyStatusResponse;
+    },
+    { code: "ANOMALY_STATUS_FAILED", message: "Failed to load anomaly status" },
   );
 }
 

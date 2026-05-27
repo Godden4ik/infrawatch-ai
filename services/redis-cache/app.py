@@ -72,7 +72,7 @@ KEYS_COUNT = Gauge("redis_keys_total", "Total keys stored")
 MEMORY_MAX.set(512 * 1024 * 1024)
 
 # --- Anomaly injection state ---
-anomaly = {"enabled": False, "type": None}
+anomaly = {"enabled": False, "type": None, "since": None}
 
 
 @app.get("/health")
@@ -80,15 +80,26 @@ def health():
     return {"status": "healthy", "service": "redis-cache"}
 
 
+@app.get("/state")
+def state():
+    return {
+        "service": "redis-cache",
+        "anomaly_type": anomaly["type"] if anomaly["enabled"] else None,
+        "since": anomaly["since"] if anomaly["enabled"] else None,
+    }
+
+
 @app.post("/inject")
 def inject(anomaly_type: str | None = None):
     if anomaly_type in (None, "none"):
         anomaly["enabled"] = False
         anomaly["type"] = None
+        anomaly["since"] = None
         _log_event("anomaly_toggle", "Anomaly injection disabled", endpoint="/inject", payload=anomaly_type)
         return {"anomaly": "disabled"}
     anomaly["enabled"] = True
     anomaly["type"] = anomaly_type
+    anomaly["since"] = datetime.now(UTC).isoformat()
     _log_event("anomaly_toggle", "Anomaly injection enabled", endpoint="/inject", payload=anomaly_type)
     return {"anomaly": anomaly_type, "status": "enabled"}
 

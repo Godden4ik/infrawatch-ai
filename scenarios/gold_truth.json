@@ -46,7 +46,7 @@
     "name": "Order Service Error Spike",
     "anomaly": {
       "service": "order-service",
-      "type": "error_spike"
+      "type": "error"
     },
     "expected": {
       "root_cause": "order-service",

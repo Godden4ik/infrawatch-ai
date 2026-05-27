@@ -133,6 +133,8 @@ services:
       - infrawatch
     depends_on:
       - api-backend
+    profiles:
+      - demo
 
 volumes:
   prometheus-data:

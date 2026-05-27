@@ -26,6 +26,7 @@ import {
 import { cn } from "@/lib/utils";
 import { ScenarioButtons } from "./_components/scenario-buttons";
 import { InjectForm } from "./_components/inject-form";
+import { LiveStatusPanel } from "./_components/live-status-panel";
 import type { ActiveInjection, InjectionEvent } from "./_components/types";
 
 function buildEventId(prefix: string) {
@@ -383,6 +384,10 @@ export default function AnomalyPage() {
           </div>
         </div>
       </div>
+
+      <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}>
+        <LiveStatusPanel />
+      </motion.div>
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <StatCard

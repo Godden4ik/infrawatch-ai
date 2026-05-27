@@ -12,6 +12,7 @@ Usage:
 import asyncio
 import json
 import os
+import sys
 import time
 import httpx
 import logging
@@ -35,6 +36,30 @@ SERVICE_URLS = {
     "redis-cache": os.getenv("REDIS_CACHE_URL", "http://localhost:8004"),
 }
 WAIT_TIME = int(os.getenv("BENCHMARK_WAIT_TIME", "12"))
+
+# Allow-list of (service, anomaly_type) pairs that services actually implement.
+# Mirrors the dispatch branches in each services/*/app.py _simulate() loop.
+SUPPORTED_ANOMALIES: dict[str, set[str]] = {
+    "api-gateway": {"latency", "error"},
+    "payment-service": {"latency", "cache_degraded", "error"},
+    "user-service": {"latency", "error", "memory_leak"},
+    "order-service": {"latency", "cache_degraded", "error"},
+    "redis-cache": {"cache_failure", "error", "memory_leak"},
+}
+
+
+def validate_scenarios(scenarios: List[Dict[str, Any]]) -> List[str]:
+    errors: List[str] = []
+    for s in scenarios:
+        svc = s.get("anomaly", {}).get("service")
+        atype = s.get("anomaly", {}).get("type")
+        allowed = SUPPORTED_ANOMALIES.get(svc)
+        if allowed is None:
+            errors.append(f"{s.get('id', '?')}: unknown service '{svc}'")
+            continue
+        if atype not in allowed:
+            errors.append(f"{s.get('id', '?')}: ({svc}, {atype}) not in {sorted(allowed)}")
+    return errors
 
 
 # ── Helpers ────────────────────────────────────────────────────────
@@ -111,6 +136,14 @@ async def run_benchmark(
 
     with open(GOLD_DATASET_PATH, "r") as f:
         scenarios = json.load(f)
+
+    validation_errors = validate_scenarios(scenarios)
+    if validation_errors:
+        await log("❌ Gold dataset validation failed:")
+        for e in validation_errors:
+            await log(f"  - {e}")
+        await log("Refusing to run benchmark with unrecognized (service, anomaly_type) pairs.")
+        sys.exit(1)
 
     await log(f"\n🚀 Starting Accuracy Benchmark ({len(scenarios)} scenarios)")
     await log(f"Model: {llm_provider} / {llm_model or 'default'}")

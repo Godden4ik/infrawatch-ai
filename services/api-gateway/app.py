@@ -64,7 +64,7 @@ def _log_event(
         "third_party": third_party or "",
         "error_code": error_code or "",
         "message": message,
-        "payload_excerpt": _payload_excerpt(payload) if payload is not None else "",
+        "payload_excerpt": _sanitize_payload_excerpt(payload) if payload is not None else "",
         "untrusted_payload": payload is not None,
     }
     _log_buffer.append(entry)
@@ -86,12 +86,21 @@ ERROR_RATE = Gauge("gateway_error_rate", "Current error rate (0-1)")
 ACTIVE_CONNECTIONS = Gauge("gateway_active_connections", "Active connections")
 
 # --- Anomaly injection state ---
-anomaly = {"enabled": False, "type": None}
+anomaly = {"enabled": False, "type": None, "since": None}
 
 
 @app.get("/health")
 def health():
     return {"status": "healthy", "service": "api-gateway"}
+
+
+@app.get("/state")
+def state():
+    return {
+        "service": "api-gateway",
+        "anomaly_type": anomaly["type"] if anomaly["enabled"] else None,
+        "since": anomaly["since"] if anomaly["enabled"] else None,
+    }
 
 
 @app.post("/inject")
@@ -100,10 +109,12 @@ def inject(anomaly_type: str | None = None):
     if anomaly_type in (None, "none"):
         anomaly["enabled"] = False
         anomaly["type"] = None
+        anomaly["since"] = None
         _log_event("anomaly_toggle", "Anomaly injection disabled", endpoint="/inject", payload=anomaly_type)
         return {"anomaly": "disabled"}
     anomaly["enabled"] = True
     anomaly["type"] = anomaly_type
+    anomaly["since"] = datetime.now(UTC).isoformat()
     _log_event("anomaly_toggle", "Anomaly injection enabled", endpoint="/inject", payload=anomaly_type)
     return {"anomaly": anomaly_type, "status": "enabled"}
 

@@ -8,8 +8,35 @@ import {
 } from "@/services/graph/query-options";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Zap, BookOpen } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Zap, BookOpen, AlertTriangle, RefreshCw } from "lucide-react";
 import { cn } from "@/lib/utils";
+
+interface QueryErrorProps {
+  message: string;
+  onRetry: () => void;
+}
+
+function QueryError({ message, onRetry }: QueryErrorProps) {
+  return (
+    <div className="flex flex-col gap-2 border border-destructive/30 bg-destructive/10 p-3 text-xs text-destructive">
+      <div className="flex items-center gap-2 font-mono uppercase tracking-[0.16em]">
+        <AlertTriangle className="h-3.5 w-3.5" />
+        <span>Request failed</span>
+      </div>
+      <p className="leading-relaxed">{message}</p>
+      <Button
+        variant="destructive"
+        size="xs"
+        onClick={onRetry}
+        className="self-start"
+      >
+        <RefreshCw />
+        Retry
+      </Button>
+    </div>
+  );
+}
 
 interface BlastRadiusPanelProps {
   service: string;
@@ -31,7 +58,14 @@ export function BlastRadiusPanel({ service }: BlastRadiusPanelProps) {
           <h4 className="text-sm font-semibold">Blast Radius</h4>
         </div>
 
-        {blastRadius.isLoading ? <Skeleton className="h-16" /> : null}
+        {blastRadius.isPending ? <Skeleton className="h-16" /> : null}
+
+        {blastRadius.isError ? (
+          <QueryError
+            message={blastRadius.error.message}
+            onRetry={() => blastRadius.refetch()}
+          />
+        ) : null}
 
         {blastRadius.data ? (
           blastRadius.data.affected_services.length === 0 ? (
@@ -71,7 +105,14 @@ export function BlastRadiusPanel({ service }: BlastRadiusPanelProps) {
           <h4 className="text-sm font-semibold">Runbooks</h4>
         </div>
 
-        {runbooks.isLoading ? <Skeleton className="h-24" /> : null}
+        {runbooks.isPending ? <Skeleton className="h-24" /> : null}
+
+        {runbooks.isError ? (
+          <QueryError
+            message={runbooks.error.message}
+            onRetry={() => runbooks.refetch()}
+          />
+        ) : null}
 
         {runbooks.data && runbooks.data.length === 0 ? (
           <p className="text-sm text-muted-foreground">No runbooks available.</p>

@@ -45,6 +45,25 @@ export type PipelineState = {
   error?: string;
 };
 
+export type PipelineRunParams = {
+  llmProvider?: string;
+  llmModel?: string;
+  apiKey?: string;
+};
+
+export type TransportStatus = "connecting" | "streaming" | "complete" | "error";
+
+export function deriveTransportStatus(
+  state: PipelineState | undefined,
+  isPending: boolean,
+): TransportStatus {
+  if (state?.status === "error") return "error";
+  if (state?.status === "complete") return "complete";
+  if (state?.status === "running") return "streaming";
+  if (isPending) return "connecting";
+  return "connecting";
+}
+
 export const AGENT_ORDER = [
   "monitor_node",
   "analyst_node",

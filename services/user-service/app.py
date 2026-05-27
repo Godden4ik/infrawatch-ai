@@ -72,9 +72,13 @@ RESPONSE_TIME = Histogram(
     buckets=[0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0],
 )
 REGISTRATIONS = Counter("user_registrations_total", "New user registrations")
+MEMORY_USED = Gauge("user_memory_used_bytes", "Memory used by user-service in bytes")
+MEMORY_MAX = Gauge("user_memory_max_bytes", "Max configured memory for user-service")
+MEMORY_MAX.set(512 * 1024 * 1024)
+MEMORY_USED.set(80 * 1024 * 1024)
 
 # --- Anomaly injection state ---
-anomaly = {"enabled": False, "type": None}
+anomaly = {"enabled": False, "type": None, "since": None}
 
 
 @app.get("/health")
@@ -82,15 +86,26 @@ def health():
     return {"status": "healthy", "service": "user-service"}
 
 
+@app.get("/state")
+def state():
+    return {
+        "service": "user-service",
+        "anomaly_type": anomaly["type"] if anomaly["enabled"] else None,
+        "since": anomaly["since"] if anomaly["enabled"] else None,
+    }
+
+
 @app.post("/inject")
 def inject(anomaly_type: str | None = None):
     if anomaly_type in (None, "none"):
         anomaly["enabled"] = False
         anomaly["type"] = None
+        anomaly["since"] = None
         _log_event("anomaly_toggle", "Anomaly injection disabled", endpoint="/inject", payload=anomaly_type)
         return {"anomaly": "disabled"}
     anomaly["enabled"] = True
     anomaly["type"] = anomaly_type
+    anomaly["since"] = datetime.now(UTC).isoformat()
     _log_event("anomaly_toggle", "Anomaly injection enabled", endpoint="/inject", payload=anomaly_type)
     return {"anomaly": anomaly_type, "status": "enabled"}
 
@@ -113,6 +128,8 @@ def _simulate():
     sessions = 200
     endpoints = ["/login", "/register", "/profile", "/logout"]
     tick = 0
+    mem_bytes = 80 * 1024 * 1024
+    mem_baseline = mem_bytes
     while True:
         tick += 1
         ep = random.choice(endpoints)
@@ -120,8 +137,27 @@ def _simulate():
         resp_time = random.uniform(0.005, 0.06)
         if anomaly["enabled"] and anomaly["type"] == "latency":
             resp_time += random.uniform(0.3, 1.5)
+        if anomaly["enabled"] and anomaly["type"] == "memory_leak":
+            resp_time += random.uniform(0.05, 0.25)
 
         RESPONSE_TIME.labels(endpoint=ep).observe(resp_time)
+
+        if anomaly["enabled"] and anomaly["type"] == "memory_leak":
+            mem_bytes = min(mem_bytes + random.randint(2 * 1024 * 1024, 6 * 1024 * 1024), 512 * 1024 * 1024)
+        else:
+            drift = random.randint(-512 * 1024, 512 * 1024)
+            mem_bytes = max(mem_baseline, min(mem_bytes + drift, mem_baseline + 8 * 1024 * 1024))
+        MEMORY_USED.set(mem_bytes)
+
+        if anomaly["enabled"] and anomaly["type"] == "memory_leak" and tick % 10 == 0:
+            _log_event(
+                "memory_pressure",
+                "Heap usage growing without release; suspected memory leak",
+                severity="WARNING",
+                endpoint=ep,
+                error_code="MEMORY_LEAK",
+                payload={"memory_used_bytes": mem_bytes, "sessions": sessions},
+            )
 
         # Auth simulation
         if ep == "/login":

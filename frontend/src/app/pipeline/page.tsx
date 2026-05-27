@@ -4,13 +4,25 @@ import { Fragment, useSyncExternalStore } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { motion } from "motion/react";
 import {
+  AlertTriangle,
   Check,
+  CheckCircle2,
   Eye,
+  Radio,
+  RefreshCw,
   Search,
+  Wifi,
+  WifiOff,
   Wrench,
 } from "lucide-react";
 import { pipelineKeys } from "@/services/pipeline/query-options";
-import type { PipelineState } from "@/services/pipeline/schema";
+import {
+  deriveTransportStatus,
+  type PipelineRunParams,
+  type PipelineState,
+  type TransportStatus,
+} from "@/services/pipeline/schema";
+import { usePipelineStream } from "@/services/pipeline/use-pipeline";
 import {
   Card,
   CardAction,
@@ -20,9 +32,36 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { PipelineControls } from "./_components/pipeline-controls";
 import { PipelineViewer } from "./_components/pipeline-viewer";
+
+const TRANSPORT_CONFIG: Record<
+  TransportStatus,
+  { label: string; icon: typeof Wifi; className: string }
+> = {
+  connecting: {
+    label: "Connecting",
+    icon: Wifi,
+    className: "text-muted-foreground border-border",
+  },
+  streaming: {
+    label: "Streaming",
+    icon: Radio,
+    className: "border-primary/20 bg-primary/10 text-primary",
+  },
+  complete: {
+    label: "Complete",
+    icon: CheckCircle2,
+    className: "border-success/20 bg-success/10 text-success",
+  },
+  error: {
+    label: "Disconnected",
+    icon: WifiOff,
+    className: "border-destructive/20 bg-destructive/10 text-destructive",
+  },
+};
 
 const STEP_CONFIG = [
   {
@@ -269,7 +308,23 @@ export default function PipelinePage() {
     () => undefined,
   );
 
+  const retryMutation = usePipelineStream();
+  const transport = deriveTransportStatus(state, retryMutation.isPending);
+  const transportCfg = TRANSPORT_CONFIG[transport];
+  const TransportIcon = transportCfg.icon;
+
   const summary = getStageSummary(state);
+
+  const showDisconnectBanner =
+    state?.status === "error" && !retryMutation.isPending;
+
+  function handleRetry() {
+    const params = queryClient.getQueryData<PipelineRunParams>(
+      pipelineKeys.lastParams(),
+    );
+    if (!params) return;
+    retryMutation.mutate(params);
+  }
 
   return (
     <motion.div
@@ -301,7 +356,16 @@ export default function PipelinePage() {
           </div>
           <div className="bg-card/50 px-3 py-2 ring-1 ring-inset ring-border/70">
             <div className="tracking-[0.16em] uppercase">Transport</div>
-            <div className="mt-1 text-sm font-semibold text-foreground">SSE</div>
+            <Badge
+              variant="outline"
+              className={cn(
+                "mt-1 font-mono text-[11px]",
+                transportCfg.className,
+              )}
+            >
+              <TransportIcon className="mr-1 h-3 w-3" />
+              {transportCfg.label}
+            </Badge>
           </div>
         </div>
       </div>
@@ -330,6 +394,39 @@ export default function PipelinePage() {
       </div>
 
       <ProgressRail state={state} />
+
+      {showDisconnectBanner ? (
+        <motion.div
+          initial={{ opacity: 0, y: -4 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="flex flex-col gap-3 bg-destructive/10 px-4 py-3 ring-1 ring-inset ring-destructive/20 sm:flex-row sm:items-center sm:justify-between"
+        >
+          <div className="flex items-start gap-3">
+            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-destructive" />
+            <div>
+              <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-destructive">
+                Stream disconnected
+              </p>
+              <p className="mt-1 text-xs text-destructive/90">
+                {state?.error ?? "The pipeline stream ended unexpectedly."}
+              </p>
+            </div>
+          </div>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={handleRetry}
+            disabled={
+              retryMutation.isPending ||
+              !queryClient.getQueryData(pipelineKeys.lastParams())
+            }
+            className="gap-2"
+          >
+            <RefreshCw className="h-3.5 w-3.5" />
+            Retry run
+          </Button>
+        </motion.div>
+      ) : null}
 
       <div className="grid gap-3 xl:grid-cols-[320px_minmax(0,1fr)]">
         <div className="xl:sticky xl:top-20 xl:self-start">

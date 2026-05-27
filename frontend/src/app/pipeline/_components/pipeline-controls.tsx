@@ -14,7 +14,10 @@ import {
 import { usePipelineStream } from "@/services/pipeline/use-pipeline";
 import type { PipelineState } from "@/services/pipeline/schema";
 import type { ProviderSelection } from "@/components/provider-selector";
-import { ProviderCombobox } from "@/components/provider-combobox";
+import {
+  ProviderCombobox,
+  type ProviderListStatus,
+} from "@/components/provider-combobox";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -72,10 +75,26 @@ export function PipelineControls({ state }: PipelineControlsProps) {
     provider: "anthropic",
     model: "claude-haiku-4-5-20251001",
   });
+  const [providerStatus, setProviderStatus] =
+    useState<ProviderListStatus>("loading");
 
   const mutation = usePipelineStream();
   const status = statusCopy(state?.status);
   const StatusIcon = status.icon;
+
+  const noModelReady = !selection.model || providerStatus !== "ready";
+  const runDisabled = mutation.isPending || !selection.provider || noModelReady;
+
+  const runHint =
+    providerStatus === "loading"
+      ? "loading models..."
+      : providerStatus === "empty"
+        ? "no healthy provider"
+        : providerStatus === "error"
+          ? "provider lookup failed"
+          : !selection.model
+            ? "select a model"
+            : null;
 
   function handleRun() {
     mutation.mutate({
@@ -117,6 +136,7 @@ export function PipelineControls({ state }: PipelineControlsProps) {
         <ProviderCombobox
           value={selection}
           onChange={setSelection}
+          onStatusChange={setProviderStatus}
         />
 
         <div className="space-y-2 bg-muted/30 px-3 py-3 ring-1 ring-inset ring-border/60">
@@ -138,24 +158,31 @@ export function PipelineControls({ state }: PipelineControlsProps) {
           </div>
         </div>
 
-        <Button
-          onClick={handleRun}
-          disabled={mutation.isPending || !selection.provider || !selection.model}
-          size="lg"
-          className="w-full justify-center gap-2"
-        >
-          {mutation.isPending ? (
-            <>
-              <Loader2 className="h-4 w-4 animate-spin" />
-              Running pipeline
-            </>
-          ) : (
-            <>
-              <Play className="h-4 w-4" />
-              Launch trace
-            </>
-          )}
-        </Button>
+        <div className="space-y-1.5">
+          <Button
+            onClick={handleRun}
+            disabled={runDisabled}
+            size="lg"
+            className="w-full justify-center gap-2"
+          >
+            {mutation.isPending ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Running pipeline
+              </>
+            ) : (
+              <>
+                <Play className="h-4 w-4" />
+                Launch trace
+              </>
+            )}
+          </Button>
+          {runHint && !mutation.isPending ? (
+            <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
+              {runHint}
+            </p>
+          ) : null}
+        </div>
 
         <div className="space-y-2 bg-muted/30 px-3 py-3 ring-1 ring-inset ring-border/60">
           <div className="flex items-center gap-2">

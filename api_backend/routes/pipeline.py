@@ -6,7 +6,7 @@ import logging
 import traceback
 from typing import AsyncGenerator
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Request
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
@@ -114,11 +114,13 @@ def _describe_exception(exc: BaseException) -> str:
     return leaf.__class__.__name__
 
 
-async def _stream_events(req: PipelineRequest) -> AsyncGenerator[str, None]:
+async def _stream_events(req: PipelineRequest, request: Request) -> AsyncGenerator[str, None]:
     """Run pipeline in a dedicated asyncio task; relay SSE via a queue.
 
     The pipeline task owns all anyio cancel scopes (MCP stdio sessions) from
     start to finish — never cancelled mid-run to avoid cross-task scope errors.
+    On client disconnect we stop yielding but keep draining the queue so the
+    producer can finish cleanly.
     """
     queue: asyncio.Queue[str | None] = asyncio.Queue()
 
@@ -146,22 +148,42 @@ async def _stream_events(req: PipelineRequest) -> AsyncGenerator[str, None]:
             await queue.put(None)  # sentinel
 
     task = asyncio.create_task(_run())
+    disconnected = False
 
-    while True:
-        item = await queue.get()
-        if item is None:
-            break
-        yield item
+    try:
+        while True:
+            try:
+                item = await asyncio.wait_for(queue.get(), timeout=1.0)
+            except asyncio.TimeoutError:
+                if await request.is_disconnected():
+                    disconnected = True
+                    logger.debug("Pipeline stream client disconnected; draining task")
+                    break
+                continue
+            if item is None:
+                break
+            yield item
+            if await request.is_disconnected():
+                disconnected = True
+                logger.debug("Pipeline stream client disconnected; draining task")
+                break
+    finally:
+        if disconnected:
+            while True:
+                item = await queue.get()
+                if item is None:
+                    break
 
     await task  # wait for clean teardown — do NOT cancel
 
-    yield 'data: {"type": "done"}\n\n'
+    if not disconnected:
+        yield 'data: {"type": "done"}\n\n'
 
 
 @router.post("/run")
-async def run_pipeline_endpoint(req: PipelineRequest = PipelineRequest()):
+async def run_pipeline_endpoint(request: Request, req: PipelineRequest = PipelineRequest()):
     return StreamingResponse(
-        _stream_events(req),
+        _stream_events(req, request),
         media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
     )
