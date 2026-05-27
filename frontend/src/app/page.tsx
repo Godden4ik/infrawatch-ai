@@ -28,6 +28,10 @@ import {
 } from "lucide-react";
 import { SiRedis } from "react-icons/si";
 import { EXTERNAL_SERVICES } from "@/lib/external-services";
+import {
+  ServiceDetailSheet,
+  type ServiceDetailSheetService,
+} from "@/app/_components/service-detail-sheet";
 import type { ComponentType, SVGProps } from "react";
 
 type LucideIconProps = { className?: string; size?: number | string };
@@ -102,10 +106,12 @@ function ServiceCard({
   name,
   status,
   serviceId,
+  onSelect,
 }: {
   name: string;
   status: ServiceStatus;
   serviceId: string;
+  onSelect: () => void;
 }) {
   const Icon = MICROSERVICE_ICONS[name] ?? (Server as IconComponent);
   const variant = toVariant(status);
@@ -113,32 +119,39 @@ function ServiceCard({
   return (
     <Card
       tone={status === "unreachable" ? "critical" : status === "unhealthy" ? "degraded" : "default"}
-      className="p-0"
+      className="p-0 transition-colors focus-within:ring-2 focus-within:ring-ring hover:bg-muted/30"
       style={{ viewTransitionName: `node-${serviceId}` }}
     >
-      <CardContent className="p-3">
-        <div className="flex items-start justify-between gap-2">
-          <div className="flex min-w-0 items-center gap-2">
-            <Icon
-              className="h-3.5 w-3.5 shrink-0 text-muted-foreground"
-              size={14}
-            />
-            <span className="truncate font-mono text-xs">{name}</span>
+      <button
+        type="button"
+        onClick={onSelect}
+        aria-label={`View details for ${name}`}
+        className="block w-full cursor-pointer text-left outline-none"
+      >
+        <CardContent className="p-3">
+          <div className="flex items-start justify-between gap-2">
+            <div className="flex min-w-0 items-center gap-2">
+              <Icon
+                className="h-3.5 w-3.5 shrink-0 text-muted-foreground"
+                size={14}
+              />
+              <span className="truncate font-mono text-xs">{name}</span>
+            </div>
+            <StatusDot variant={variant} size="sm" />
           </div>
-          <StatusDot variant={variant} size="sm" />
-        </div>
-        <p
-          className={`mt-2 font-mono text-[10px] uppercase tracking-[0.14em] ${
-            variant === "healthy"
-              ? "text-status-healthy"
-              : variant === "degraded"
-                ? "text-status-degraded"
-                : "text-status-critical"
-          }`}
-        >
-          {status}
-        </p>
-      </CardContent>
+          <p
+            className={`mt-2 font-mono text-[10px] uppercase tracking-[0.14em] ${
+              variant === "healthy"
+                ? "text-status-healthy"
+                : variant === "degraded"
+                  ? "text-status-degraded"
+                  : "text-status-critical"
+            }`}
+          >
+            {status}
+          </p>
+        </CardContent>
+      </button>
     </Card>
   );
 }
@@ -146,19 +159,21 @@ function ServiceCard({
 function ExternalServiceCard({
   service,
   healthVariant,
+  onSelect,
 }: {
   service: (typeof EXTERNAL_SERVICES)[number];
   healthVariant: StatusVariant | null;
+  onSelect: () => void;
 }) {
   const Icon = service.icon;
   return (
-    <a
-      href={service.url}
-      target="_blank"
-      rel="noopener noreferrer"
-      className="group flex items-center justify-between gap-3 border border-border/60 bg-muted/30 px-3 py-2.5 transition-colors hover:border-border hover:bg-muted/50"
-    >
-      <div className="flex min-w-0 items-center gap-2.5">
+    <div className="group relative flex items-center justify-between gap-3 border border-border/60 bg-muted/30 transition-colors focus-within:border-border hover:border-border hover:bg-muted/50">
+      <button
+        type="button"
+        onClick={onSelect}
+        aria-label={`View details for ${service.label}`}
+        className="flex min-w-0 flex-1 cursor-pointer items-center gap-2.5 px-3 py-2.5 text-left outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
+      >
         <Icon className="h-4 w-4 shrink-0 text-muted-foreground" />
         <div className="min-w-0">
           <p className="truncate font-mono text-xs text-foreground">
@@ -168,12 +183,21 @@ function ExternalServiceCard({
             {service.description}
           </p>
         </div>
-      </div>
-      <div className="flex items-center gap-2">
+      </button>
+      <div className="flex items-center gap-2 pr-3">
         {healthVariant && <StatusDot variant={healthVariant} size="sm" />}
-        <ExternalLink className="h-3 w-3 shrink-0 text-muted-foreground/60 transition-colors group-hover:text-foreground" />
+        <a
+          href={service.url}
+          target="_blank"
+          rel="noopener noreferrer"
+          onClick={(e) => e.stopPropagation()}
+          aria-label={`Open ${service.label} in new tab`}
+          className="inline-flex h-6 w-6 items-center justify-center text-muted-foreground/60 outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+        >
+          <ExternalLink className="h-3 w-3 shrink-0" />
+        </a>
       </div>
-    </a>
+    </div>
   );
 }
 
@@ -209,6 +233,14 @@ export default function HomePage() {
     providerQueries.list(),
   );
   const [sqliteKeyIds, setSqliteKeyIds] = useState<Set<string>>(new Set());
+  const [sheetOpen, setSheetOpen] = useState(false);
+  const [selectedService, setSelectedService] =
+    useState<ServiceDetailSheetService | null>(null);
+
+  const openServiceSheet = (service: ServiceDetailSheetService) => {
+    setSelectedService(service);
+    setSheetOpen(true);
+  };
 
   useEffect(() => {
     getKeyStatus().then((result) => {
@@ -358,14 +390,27 @@ export default function HomePage() {
           </div>
         ) : data ? (
           <div className="grid grid-cols-2 gap-2 md:grid-cols-3 lg:grid-cols-4">
-            {microservices.map((name) => (
-              <ServiceCard
-                key={name}
-                name={name}
-                serviceId={name}
-                status={data.services[name]}
-              />
-            ))}
+            {microservices.map((name) => {
+              const status = data.services[name];
+              const variant = toVariant(status);
+              return (
+                <ServiceCard
+                  key={name}
+                  name={name}
+                  serviceId={name}
+                  status={status}
+                  onSelect={() =>
+                    openServiceSheet({
+                      id: name,
+                      name,
+                      type: "Microservice",
+                      healthVariant: variant,
+                      healthLabel: status,
+                    })
+                  }
+                />
+              );
+            })}
           </div>
         ) : null}
       </div>
@@ -383,6 +428,15 @@ export default function HomePage() {
                 key={svc.id}
                 service={svc}
                 healthVariant={healthVariant}
+                onSelect={() =>
+                  openServiceSheet({
+                    id: svc.id,
+                    name: svc.label,
+                    type: svc.label,
+                    healthVariant: healthVariant ?? "unknown",
+                    healthLabel: status ?? "unknown",
+                  })
+                }
               />
             );
           })}
@@ -426,6 +480,12 @@ export default function HomePage() {
         Auto-refreshes every 30s &middot; Last updated:{" "}
         <span suppressHydrationWarning>{new Date().toLocaleTimeString()}</span>
       </p>
+
+      <ServiceDetailSheet
+        open={sheetOpen}
+        onOpenChange={setSheetOpen}
+        service={selectedService}
+      />
     </PageMount>
   );
 }

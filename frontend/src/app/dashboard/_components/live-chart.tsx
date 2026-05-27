@@ -109,7 +109,31 @@ export function LiveChart({ label, points, colorVar, format }: LiveChartProps) {
               animate={false}
               theme={nivoTheme}
               enableCrosshair
-              isInteractive={false}
+              crosshairType="x"
+              isInteractive
+              enableSlices="x"
+              sliceTooltip={({ slice }) => {
+                const datum = slice.points[0];
+                if (!datum) return null;
+                const d = datum.data as unknown as { x: number; y: number };
+                const t = new Date(d.x);
+                const hh = String(t.getHours()).padStart(2, "0");
+                const mm = String(t.getMinutes()).padStart(2, "0");
+                const ss = String(t.getSeconds()).padStart(2, "0");
+                return (
+                  <div className="border border-border bg-popover px-2.5 py-1.5 font-mono text-[11px] text-popover-foreground shadow-md">
+                    <div className="text-[9px] tracking-[0.16em] text-muted-foreground/80 uppercase">
+                      {hh}:{mm}:{ss}
+                    </div>
+                    <div
+                      className="mt-0.5 text-sm font-semibold tabular-nums"
+                      style={{ color }}
+                    >
+                      {formatMetricValue(d.y, format)}
+                    </div>
+                  </div>
+                );
+              }}
             />
           ) : (
             <div className="flex h-full items-center justify-center">

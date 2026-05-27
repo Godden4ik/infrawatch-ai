@@ -1,10 +1,10 @@
 "use client";
 
-import { motion } from "motion/react";
 import { useMetricsStream } from "@/hooks/use-metrics-stream";
 import { ServiceMetrics } from "./_components/service-metrics";
 import { LiveMonitor } from "./_components/live-monitor";
 import { PageHeader, PageMetaCell } from "@/components/layout/page-header";
+import { PageMount } from "@/components/layout/page-mount";
 import { cn } from "@/lib/utils";
 
 const SERVICES = [
@@ -19,7 +19,7 @@ export default function DashboardPage() {
   const { services } = useMetricsStream();
 
   return (
-    <div className="space-y-4">
+    <PageMount className="space-y-4">
       <PageHeader
         title="Service Health"
         description="Live Prometheus metrics streaming across every monitored service"
@@ -33,8 +33,8 @@ export default function DashboardPage() {
       />
 
       <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
-        {SERVICES.map((svc, i) => (
-          <motion.div
+        {SERVICES.map((svc) => (
+          <div
             key={svc}
             className={cn(
               "h-full",
@@ -42,16 +42,13 @@ export default function DashboardPage() {
                 "md:col-span-2 xl:col-span-3 2xl:col-span-4",
             )}
             style={{ viewTransitionName: `node-${svc}` }}
-            initial={{ opacity: 0, y: 16 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.35, delay: i * 0.06 }}
           >
             <ServiceMetrics serviceName={svc} streamData={services[svc]} />
-          </motion.div>
+          </div>
         ))}
       </div>
 
       <LiveMonitor />
-    </div>
+    </PageMount>
   );
 }

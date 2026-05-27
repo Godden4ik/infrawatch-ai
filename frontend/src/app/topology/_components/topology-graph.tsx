@@ -159,7 +159,7 @@ export function TopologyGraph({
       <style>{`
         @keyframes topology-dash {
           to {
-            stroke-dashoffset: -48;
+            stroke-dashoffset: -32;
           }
         }
 
@@ -168,22 +168,30 @@ export function TopologyGraph({
           stroke: var(--muted-foreground);
           stroke-opacity: 0.42;
           stroke-width: 1.75;
-          stroke-dasharray: 4 7;
-          animation: topology-dash 14s linear infinite;
+          stroke-dasharray: 4 6;
+          animation: topology-dash 1.6s linear infinite;
         }
 
         .topology-edge-path--selected {
           stroke: var(--brand);
-          stroke-opacity: 0.9;
+          stroke-opacity: 0.95;
           stroke-width: 2;
-          animation-duration: 8s;
+          animation-duration: 0.9s;
         }
 
         .topology-edge-path--affected {
           stroke: var(--status-critical);
-          stroke-opacity: 0.78;
+          stroke-opacity: 0.82;
           stroke-width: 2;
-          animation-duration: 6s;
+          animation-duration: 0.7s;
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+          .topology-edge-path,
+          .topology-edge-path--selected,
+          .topology-edge-path--affected {
+            animation: none !important;
+          }
         }
 
         .react-flow__controls {

@@ -7,6 +7,7 @@ import { providerQueries } from "@/services/providers/query-options";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/layout/page-header";
+import { PageMount } from "@/components/layout/page-mount";
 import { ProviderCombobox } from "@/components/provider-combobox";
 import type { ProviderSelection } from "@/components/provider-selector";
 import { Input } from "@/components/ui/input";
@@ -129,7 +130,7 @@ export default function BenchmarkPage() {
     : null;
 
   return (
-    <div className="mx-auto max-w-6xl space-y-4">
+    <PageMount className="mx-auto max-w-6xl space-y-4">
       <PageHeader
         title="Accuracy Benchmark"
         description="Run the agent pipeline against a gold dataset to measure precision and recall"
@@ -365,7 +366,7 @@ export default function BenchmarkPage() {
           </AnimatePresence>
         </div>
       </div>
-    </div>
+    </PageMount>
   );
 }
 

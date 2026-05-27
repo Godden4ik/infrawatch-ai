@@ -35,6 +35,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { StatusPill, type StatusVariant } from "@/components/ui/status-indicator";
 import { PageHeader, PageMetaCell } from "@/components/layout/page-header";
+import { PageMount } from "@/components/layout/page-mount";
 import { cn } from "@/lib/utils";
 import { PipelineControls } from "./_components/pipeline-controls";
 import { PipelineViewer } from "./_components/pipeline-viewer";
@@ -338,12 +339,7 @@ export default function PipelinePage() {
   }
 
   return (
-    <motion.div
-      className="mx-auto max-w-6xl space-y-4"
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      transition={{ duration: 0.25 }}
-    >
+    <PageMount className="mx-auto max-w-6xl space-y-4">
       <PageHeader
         title="Agent Pipeline"
         description="Split-pane runtime for streaming detection, topology analysis, and response planning."
@@ -434,6 +430,6 @@ export default function PipelinePage() {
         </div>
         <PipelineViewer state={state} />
       </div>
-    </motion.div>
+    </PageMount>
   );
 }

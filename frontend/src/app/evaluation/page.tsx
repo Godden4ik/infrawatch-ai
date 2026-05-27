@@ -10,6 +10,7 @@ import { ComparisonChart } from "./_components/comparison-chart";
 import { ResultsTable } from "./_components/results-table";
 import { Card, CardContent } from "@/components/ui/card";
 import { PageHeader, PageMetaCell } from "@/components/layout/page-header";
+import { PageMount } from "@/components/layout/page-mount";
 import { FlaskConical, GitCompareArrows, Network, SearchCheck } from "lucide-react";
 
 function StatCard({
@@ -65,7 +66,7 @@ export default function EvaluationPage() {
   const queryState = data ? "ready" : "idle";
 
   return (
-    <div className="mx-auto max-w-6xl space-y-4">
+    <PageMount className="mx-auto max-w-6xl space-y-4">
       <PageHeader
         title="RAG Evaluation"
         description="Compare topology-aware retrieval against embedding-only retrieval with the same judge pipeline"
@@ -161,6 +162,6 @@ export default function EvaluationPage() {
           <ResultsTable data={data} />
         </motion.div>
       ) : null}
-    </div>
+    </PageMount>
   );
 }

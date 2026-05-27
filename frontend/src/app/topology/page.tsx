@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { motion } from "motion/react";
 import { useQuery } from "@tanstack/react-query";
 import { blastRadiusQueryOptions } from "@/services/graph/query-options";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -38,17 +39,40 @@ export default function TopologyPage() {
         }
       />
 
-      <div className="grid min-h-0 flex-1 gap-4 xl:grid-cols-[minmax(0,1fr)_340px]">
-        <Card className="min-h-0 flex-1 gap-0 py-0">
-          <TopologyGraph
-            selectedService={selectedService}
-            affectedServices={affectedServices}
-            onNodeClick={setSelectedService}
-            onPaneClick={() => setSelectedService(null)}
-          />
-        </Card>
+      <motion.div
+        className="grid min-h-0 flex-1 gap-4 xl:grid-cols-[minmax(0,1fr)_340px]"
+        initial="hidden"
+        animate="visible"
+        variants={{
+          hidden: {},
+          visible: { transition: { staggerChildren: 0.08, delayChildren: 0.05 } },
+        }}
+      >
+        <motion.div
+          className="min-h-0"
+          variants={{
+            hidden: { opacity: 0, y: 8 },
+            visible: { opacity: 1, y: 0, transition: { duration: 0.32, ease: [0.16, 1, 0.3, 1] } },
+          }}
+        >
+          <Card className="h-full min-h-0 flex-1 gap-0 py-0">
+            <TopologyGraph
+              selectedService={selectedService}
+              affectedServices={affectedServices}
+              onNodeClick={setSelectedService}
+              onPaneClick={() => setSelectedService(null)}
+            />
+          </Card>
+        </motion.div>
 
-        <Card className="min-h-0 gap-0 py-0">
+        <motion.div
+          className="min-h-0"
+          variants={{
+            hidden: { opacity: 0, y: 8 },
+            visible: { opacity: 1, y: 0, transition: { duration: 0.32, ease: [0.16, 1, 0.3, 1] } },
+          }}
+        >
+        <Card className="h-full min-h-0 gap-0 py-0">
           <CardHeader className="border-b border-border/70 py-4">
             {selectedService ? (
               <div className="flex items-start justify-between gap-3">
@@ -92,7 +116,8 @@ export default function TopologyPage() {
             )}
           </ScrollArea>
         </Card>
-      </div>
+        </motion.div>
+      </motion.div>
     </div>
   );
 }

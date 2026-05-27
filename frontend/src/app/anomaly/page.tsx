@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { motion } from "motion/react";
 import { AlertTriangle, History, ShieldAlert, Target } from "lucide-react";
 import { healthQueryOptions } from "@/services/health/query-options";
 import { SERVICES } from "@/services/anomaly/schema";
@@ -24,6 +23,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { PageHeader, PageMetaCell } from "@/components/layout/page-header";
+import { PageMount } from "@/components/layout/page-mount";
 import { cn } from "@/lib/utils";
 import { ScenarioButtons } from "./_components/scenario-buttons";
 import { InjectForm } from "./_components/inject-form";
@@ -354,12 +354,7 @@ export default function AnomalyPage() {
   }
 
   return (
-    <motion.div
-      className="mx-auto max-w-6xl space-y-4"
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      transition={{ duration: 0.25 }}
-    >
+    <PageMount className="mx-auto max-w-6xl space-y-4">
       <PageHeader
         title="Anomaly Injection"
         description="Dense control surface for single-service faults and dependency cascades."
@@ -372,9 +367,7 @@ export default function AnomalyPage() {
         }
       />
 
-      <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}>
-        <LiveStatusPanel />
-      </motion.div>
+      <LiveStatusPanel />
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <StatCard
@@ -401,49 +394,27 @@ export default function AnomalyPage() {
 
       <div className="grid gap-3 xl:grid-cols-[minmax(0,1.35fr)_minmax(320px,0.85fr)]">
         <div className="space-y-3">
-          <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}>
-            <InjectForm
-              activeInjections={activeInjections}
-              serviceStatuses={services}
-              onInjected={handleInjected}
-            />
-          </motion.div>
+          <InjectForm
+            activeInjections={activeInjections}
+            serviceStatuses={services}
+            onInjected={handleInjected}
+          />
 
-          <motion.div
-            initial={{ opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.05 }}
-          >
-            <HistoryCard events={events} />
-          </motion.div>
+          <HistoryCard events={events} />
         </div>
 
         <div className="space-y-3">
-          <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}>
-            <ScenarioButtons
-              onReset={handleReset}
-              onScenarioInjected={handleScenarioInjected}
-            />
-          </motion.div>
+          <ScenarioButtons
+            onReset={handleReset}
+            onScenarioInjected={handleScenarioInjected}
+          />
 
-          <motion.div
-            initial={{ opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.05 }}
-          >
-            <ActiveAnomaliesCard activeInjections={activeInjections} />
-          </motion.div>
+          <ActiveAnomaliesCard activeInjections={activeInjections} />
 
-          <motion.div
-            initial={{ opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.1 }}
-          >
-            <ServiceTargetsCard
-              activeInjections={activeInjections}
-              serviceStatuses={services}
-            />
-          </motion.div>
+          <ServiceTargetsCard
+            activeInjections={activeInjections}
+            serviceStatuses={services}
+          />
         </div>
       </div>
 
@@ -465,6 +436,6 @@ export default function AnomalyPage() {
           Ready for controlled failure injection
         </div>
       )}
-    </motion.div>
+    </PageMount>
   );
 }
