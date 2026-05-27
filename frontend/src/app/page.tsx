@@ -14,18 +14,20 @@ import {
 } from "@/components/ui/status-indicator";
 import { AnimatedNumber } from "@/components/ui/animated-number";
 import { PageMount } from "@/components/layout/page-mount";
+import { PageHeader } from "@/components/layout/page-header";
 import {
   Shield,
   CreditCard,
   User,
   Package,
   Server,
-  Activity,
   CheckCircle2,
   AlertTriangle,
   XCircle,
+  ExternalLink,
 } from "lucide-react";
-import { SiRedis, SiPrometheus, SiNeo4J } from "react-icons/si";
+import { SiRedis } from "react-icons/si";
+import { EXTERNAL_SERVICES } from "@/lib/external-services";
 import type { ComponentType, SVGProps } from "react";
 
 type LucideIconProps = { className?: string; size?: number | string };
@@ -40,11 +42,6 @@ const MICROSERVICE_ICONS: Record<string, IconComponent> = {
   "redis-cache": SiRedis as IconComponent,
 };
 
-const INFRA_ICONS: Record<string, IconComponent> = {
-  prometheus: SiPrometheus as IconComponent,
-  neo4j: SiNeo4J as IconComponent,
-};
-
 const MICROSERVICES = [
   "api-gateway",
   "payment-service",
@@ -52,8 +49,6 @@ const MICROSERVICES = [
   "order-service",
   "redis-cache",
 ];
-
-const INFRA_SERVICES = ["prometheus", "neo4j"];
 
 type ServiceStatus = "healthy" | "unhealthy" | "unreachable";
 
@@ -148,25 +143,37 @@ function ServiceCard({
   );
 }
 
-function InfraRow({
-  name,
-  status,
+function ExternalServiceCard({
+  service,
+  healthVariant,
 }: {
-  name: string;
-  status: ServiceStatus | undefined;
+  service: (typeof EXTERNAL_SERVICES)[number];
+  healthVariant: StatusVariant | null;
 }) {
-  const Icon = INFRA_ICONS[name] ?? (Activity as IconComponent);
-  const variant = toVariant(status ?? "unreachable");
-
+  const Icon = service.icon;
   return (
-    <div className="flex items-center gap-3 bg-muted/40 px-3 py-2">
-      <Icon
-        className="h-3.5 w-3.5 shrink-0 text-muted-foreground"
-        size={14}
-      />
-      <span className="flex-1 font-mono text-xs">{name}</span>
-      <StatusPill variant={variant}>{status ?? "unreachable"}</StatusPill>
-    </div>
+    <a
+      href={service.url}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="group flex items-center justify-between gap-3 border border-border/60 bg-muted/30 px-3 py-2.5 transition-colors hover:border-border hover:bg-muted/50"
+    >
+      <div className="flex min-w-0 items-center gap-2.5">
+        <Icon className="h-4 w-4 shrink-0 text-muted-foreground" />
+        <div className="min-w-0">
+          <p className="truncate font-mono text-xs text-foreground">
+            {service.label}
+          </p>
+          <p className="truncate text-[10px] text-muted-foreground">
+            {service.description}
+          </p>
+        </div>
+      </div>
+      <div className="flex items-center gap-2">
+        {healthVariant && <StatusDot variant={healthVariant} size="sm" />}
+        <ExternalLink className="h-3 w-3 shrink-0 text-muted-foreground/60 transition-colors group-hover:text-foreground" />
+      </div>
+    </a>
   );
 }
 
@@ -225,9 +232,6 @@ export default function HomePage() {
   const microservices = data
     ? MICROSERVICES.filter((s) => s in data.services)
     : [];
-  const infraServices = data
-    ? INFRA_SERVICES.filter((s) => s in data.services)
-    : [];
 
   const configuredProviders = providersData
     ? providersData.providers.filter(
@@ -245,12 +249,10 @@ export default function HomePage() {
 
   return (
     <PageMount className="mx-auto max-w-6xl space-y-5">
-      <div>
-        <h1 className="text-base font-semibold">System Overview</h1>
-        <p className="text-xs text-muted-foreground">
-          Real-time infrastructure health across all monitored services
-        </p>
-      </div>
+      <PageHeader
+        title="System Overview"
+        description="Real-time infrastructure health across all monitored services"
+      />
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         {isLoading ? (
@@ -370,28 +372,21 @@ export default function HomePage() {
 
       <div>
         <p className="mb-2 text-[10px] font-medium uppercase tracking-[0.14em] text-muted-foreground/80">
-          Infrastructure
+          Infrastructure Tools
         </p>
-        {isLoading ? (
-          <div className="space-y-1.5">
-            {Array.from({ length: 2 }).map((_, i) => (
-              <div key={i} className="bg-muted/40 px-3 py-2">
-                <Skeleton className="h-3 w-40" />
-              </div>
-            ))}
-          </div>
-        ) : data ? (
-          <div className="space-y-1.5">
-            {infraServices.map((name) => (
-              <InfraRow key={name} name={name} status={data.services[name]} />
-            ))}
-            {infraServices.length === 0 && (
-              <p className="font-mono text-xs text-muted-foreground">
-                No infrastructure services detected.
-              </p>
-            )}
-          </div>
-        ) : null}
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+          {EXTERNAL_SERVICES.map((svc) => {
+            const status = data?.services[svc.id];
+            const healthVariant = status ? toVariant(status) : null;
+            return (
+              <ExternalServiceCard
+                key={svc.id}
+                service={svc}
+                healthVariant={healthVariant}
+              />
+            );
+          })}
+        </div>
       </div>
 
       {providersData && providersData.providers.length > 0 && (

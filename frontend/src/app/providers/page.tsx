@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { providerQueries } from "@/services/providers/query-options";
 import { getKeyStatus } from "@/services/providers/actions";
 import { Skeleton } from "@/components/ui/skeleton";
+import { PageHeader } from "@/components/layout/page-header";
 import { StatRow } from "./_components/stat-row";
 import { ProviderCard } from "./_components/provider-card";
 import { useEffect, useState } from "react";
@@ -33,13 +34,10 @@ export default function ProvidersPage() {
 
   return (
     <div className="mx-auto max-w-5xl space-y-6">
-      {/* ── Page header ─────────────────────────────────────────────────── */}
-      <div className="space-y-1">
-        <h1 className="text-lg font-semibold tracking-tight">Providers</h1>
-        <p className="text-sm text-muted-foreground">
-          Manage LLM provider API keys and connectivity
-        </p>
-      </div>
+      <PageHeader
+        title="Providers"
+        description="Manage LLM provider API keys and connectivity"
+      />
 
       {/* ── Stat row ────────────────────────────────────────────────────── */}
       <StatRow

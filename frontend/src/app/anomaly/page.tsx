@@ -23,6 +23,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { PageHeader, PageMetaCell } from "@/components/layout/page-header";
 import { cn } from "@/lib/utils";
 import { ScenarioButtons } from "./_components/scenario-buttons";
 import { InjectForm } from "./_components/inject-form";
@@ -359,31 +360,17 @@ export default function AnomalyPage() {
       animate={{ opacity: 1 }}
       transition={{ duration: 0.25 }}
     >
-      <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
-        <div>
-          <h1 className="text-base font-semibold">Anomaly Injection</h1>
-          <p className="text-xs text-muted-foreground">
-            Dense control surface for single-service faults and dependency cascades.
-          </p>
-        </div>
-
-        <div className="grid grid-cols-2 gap-2 font-mono text-[11px] text-muted-foreground lg:grid-cols-3">
-          <div className="bg-card/50 px-3 py-2 ring-1 ring-inset ring-border/70">
-            <div className="tracking-[0.16em] uppercase">Tracked faults</div>
-            <div className="mt-1 text-sm font-semibold text-foreground">
-              {activeInjections.length}
-            </div>
-          </div>
-          <div className="bg-card/50 px-3 py-2 ring-1 ring-inset ring-border/70">
-            <div className="tracking-[0.16em] uppercase">Scenarios</div>
-            <div className="mt-1 text-sm font-semibold text-foreground">1</div>
-          </div>
-          <div className="bg-card/50 px-3 py-2 ring-1 ring-inset ring-border/70">
-            <div className="tracking-[0.16em] uppercase">Journal</div>
-            <div className="mt-1 text-sm font-semibold text-foreground">{events.length}</div>
-          </div>
-        </div>
-      </div>
+      <PageHeader
+        title="Anomaly Injection"
+        description="Dense control surface for single-service faults and dependency cascades."
+        meta={
+          <>
+            <PageMetaCell label="Tracked faults" value={activeInjections.length} />
+            <PageMetaCell label="Scenarios" value="1" />
+            <PageMetaCell label="Journal" value={events.length} />
+          </>
+        }
+      />
 
       <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}>
         <LiveStatusPanel />

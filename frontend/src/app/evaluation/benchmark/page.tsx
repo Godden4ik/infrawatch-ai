@@ -6,6 +6,7 @@ import { useQuery } from "@tanstack/react-query";
 import { providerQueries } from "@/services/providers/query-options";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { PageHeader } from "@/components/layout/page-header";
 import { ProviderCombobox } from "@/components/provider-combobox";
 import type { ProviderSelection } from "@/components/provider-selector";
 import { Input } from "@/components/ui/input";
@@ -100,18 +101,10 @@ export default function BenchmarkPage() {
 
   return (
     <div className="mx-auto max-w-6xl space-y-6">
-      <motion.div
-        className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between"
-        initial={{ opacity: 0, y: -8 }}
-        animate={{ opacity: 1, y: 0 }}
-      >
-        <div className="space-y-1.5">
-          <h1 className="text-2xl font-semibold tracking-tight">Accuracy Benchmark</h1>
-          <p className="text-sm text-muted-foreground">
-            Run the agent pipeline against a gold dataset to measure precision and recall
-          </p>
-        </div>
-      </motion.div>
+      <PageHeader
+        title="Accuracy Benchmark"
+        description="Run the agent pipeline against a gold dataset to measure precision and recall"
+      />
 
       <div className="grid gap-6 lg:grid-cols-[300px_1fr]">
         {/* Controls */}

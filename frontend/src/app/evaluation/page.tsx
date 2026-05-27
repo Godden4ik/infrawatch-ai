@@ -9,6 +9,7 @@ import { EvalForm } from "./_components/eval-form";
 import { ComparisonChart } from "./_components/comparison-chart";
 import { ResultsTable } from "./_components/results-table";
 import { Card, CardContent } from "@/components/ui/card";
+import { PageHeader, PageMetaCell } from "@/components/layout/page-header";
 import { FlaskConical, GitCompareArrows, Network, SearchCheck } from "lucide-react";
 
 function StatCard({
@@ -65,37 +66,20 @@ export default function EvaluationPage() {
 
   return (
     <div className="mx-auto max-w-6xl space-y-4">
-      <motion.div
-        className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between"
-        initial={{ opacity: 0, y: -8 }}
-        animate={{ opacity: 1, y: 0 }}
-      >
-        <div className="space-y-1.5">
-          <h1 className="text-2xl font-semibold tracking-tight">
-            RAG Evaluation
-          </h1>
-          <p className="text-sm text-muted-foreground">
-            Compare topology-aware retrieval against embedding-only retrieval
-            with the same judge pipeline
-          </p>
-        </div>
-        <div className="grid grid-cols-3 gap-2 font-mono text-[11px] text-muted-foreground">
-          <div className="bg-card/50 px-3 py-2 ring-1 ring-inset ring-border/70">
-            <div className="uppercase tracking-[0.16em]">Modes</div>
-            <div className="mt-1 text-sm font-semibold text-foreground">2</div>
-          </div>
-          <div className="bg-card/50 px-3 py-2 ring-1 ring-inset ring-border/70">
-            <div className="uppercase tracking-[0.16em]">Presets</div>
-            <div className="mt-1 text-sm font-semibold text-foreground">4</div>
-          </div>
-          <div className="bg-card/50 px-3 py-2 ring-1 ring-inset ring-border/70">
-            <div className="uppercase tracking-[0.16em]">State</div>
-            <div className="mt-1 text-sm font-semibold uppercase text-foreground">
-              {queryState}
-            </div>
-          </div>
-        </div>
-      </motion.div>
+      <PageHeader
+        title="RAG Evaluation"
+        description="Compare topology-aware retrieval against embedding-only retrieval with the same judge pipeline"
+        meta={
+          <>
+            <PageMetaCell label="Modes" value="2" />
+            <PageMetaCell label="Presets" value="4" />
+            <PageMetaCell
+              label="State"
+              value={<span className="uppercase">{queryState}</span>}
+            />
+          </>
+        }
+      />
 
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard

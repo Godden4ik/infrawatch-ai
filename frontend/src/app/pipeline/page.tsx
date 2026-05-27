@@ -33,6 +33,7 @@ import {
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { PageHeader, PageMetaCell } from "@/components/layout/page-header";
 import { cn } from "@/lib/utils";
 import { PipelineControls } from "./_components/pipeline-controls";
 import { PipelineViewer } from "./_components/pipeline-viewer";
@@ -333,42 +334,31 @@ export default function PipelinePage() {
       animate={{ opacity: 1 }}
       transition={{ duration: 0.25 }}
     >
-      <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
-        <div>
-          <h1 className="text-base font-semibold">Agent Pipeline</h1>
-          <p className="text-xs text-muted-foreground">
-            Split-pane runtime for streaming detection, topology analysis, and response planning.
-          </p>
-        </div>
-
-        <div className="grid grid-cols-3 gap-2 font-mono text-[11px] text-muted-foreground">
-          <div className="bg-card/50 px-3 py-2 ring-1 ring-inset ring-border/70">
-            <div className="tracking-[0.16em] uppercase">Status</div>
-            <div className="mt-1 text-sm font-semibold text-foreground">
-              {state?.status ?? "idle"}
-            </div>
-          </div>
-          <div className="bg-card/50 px-3 py-2 ring-1 ring-inset ring-border/70">
-            <div className="tracking-[0.16em] uppercase">Agents</div>
-            <div className="mt-1 text-sm font-semibold text-foreground">
-              {summary.completeCount}/{STEP_CONFIG.length}
-            </div>
-          </div>
-          <div className="bg-card/50 px-3 py-2 ring-1 ring-inset ring-border/70">
-            <div className="tracking-[0.16em] uppercase">Transport</div>
-            <Badge
-              variant="outline"
-              className={cn(
-                "mt-1 font-mono text-[11px]",
-                transportCfg.className,
-              )}
-            >
-              <TransportIcon className="mr-1 h-3 w-3" />
-              {transportCfg.label}
-            </Badge>
-          </div>
-        </div>
-      </div>
+      <PageHeader
+        title="Agent Pipeline"
+        description="Split-pane runtime for streaming detection, topology analysis, and response planning."
+        meta={
+          <>
+            <PageMetaCell label="Status" value={state?.status ?? "idle"} />
+            <PageMetaCell
+              label="Agents"
+              value={`${summary.completeCount}/${STEP_CONFIG.length}`}
+            />
+            <PageMetaCell
+              label="Transport"
+              value={
+                <Badge
+                  variant="outline"
+                  className={cn("font-mono text-[11px]", transportCfg.className)}
+                >
+                  <TransportIcon className="mr-1 h-3 w-3" />
+                  {transportCfg.label}
+                </Badge>
+              }
+            />
+          </>
+        }
+      />
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <StatCard
