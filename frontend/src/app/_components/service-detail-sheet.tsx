@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useQuery } from "@tanstack/react-query";
 import { Activity, Network, Zap } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -11,11 +12,17 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   StatusBar,
   StatusPill,
   type StatusVariant,
 } from "@/components/ui/status-indicator";
+import { anomalyStatusQueryOptions } from "@/services/anomaly/query-options";
+import {
+  incidentsQueryOptions,
+  runbooksQueryOptions,
+} from "@/services/graph/query-options";
 
 export interface ServiceDetailSheetService {
   id: string;
@@ -32,12 +39,49 @@ export interface ServiceDetailSheetProps {
   service: ServiceDetailSheetService | null;
 }
 
+function formatRelative(iso: string | null | undefined) {
+  if (!iso) return null;
+  const t = new Date(iso).getTime();
+  if (!Number.isFinite(t)) return null;
+  const diff = Date.now() - t;
+  if (diff < 0) return new Date(iso).toLocaleTimeString();
+  const sec = Math.floor(diff / 1000);
+  if (sec < 60) return `${sec}s ago`;
+  const min = Math.floor(sec / 60);
+  if (min < 60) return `${min}m ago`;
+  const hr = Math.floor(min / 60);
+  if (hr < 24) return `${hr}h ago`;
+  return new Date(iso).toLocaleDateString();
+}
+
 export function ServiceDetailSheet({
   open,
   onOpenChange,
   service,
 }: ServiceDetailSheetProps) {
+  const enabled = open && !!service;
+  const serviceId = service?.id ?? "";
+
+  const { data: anomalyData } = useQuery({
+    ...anomalyStatusQueryOptions,
+    enabled,
+  });
+  const { data: runbookData, isLoading: runbooksLoading } = useQuery({
+    ...runbooksQueryOptions(serviceId),
+    enabled: enabled && serviceId.length > 0,
+  });
+  const { data: incidentData, isLoading: incidentsLoading } = useQuery({
+    ...incidentsQueryOptions(serviceId),
+    enabled: enabled && serviceId.length > 0,
+  });
+
   if (!service) return null;
+
+  const anomalyEntry = anomalyData?.services.find((s) => s.service === service.id);
+  const anomalyActive = anomalyEntry?.anomaly_type ?? null;
+  const anomalySince = anomalyEntry?.since ?? null;
+  const runbookCount = runbookData?.length ?? null;
+  const incidentCount = incidentData?.length ?? null;
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -60,7 +104,7 @@ export function ServiceDetailSheet({
             </StatusPill>
           </div>
           <SheetDescription className="text-xs text-muted-foreground">
-            Deep dive — live health, recent activity, and quick actions.
+            Live health, fault state, runbooks, and quick actions.
           </SheetDescription>
         </SheetHeader>
 
@@ -87,20 +131,57 @@ export function ServiceDetailSheet({
 
           <section className="space-y-2">
             <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-muted-foreground/80">
-              Recent Activity
+              Fault State
+            </p>
+            {anomalyData ? (
+              anomalyActive ? (
+                <div className="relative flex items-start gap-3 bg-status-critical-soft px-3 py-2 ring-1 ring-inset ring-status-critical/30">
+                  <StatusBar variant="critical" />
+                  <div className="min-w-0 flex-1">
+                    <p className="font-mono text-sm uppercase text-status-critical">
+                      {anomalyActive.replace(/_/g, " ")}
+                    </p>
+                    {anomalySince && (
+                      <p className="mt-0.5 font-mono text-[10px] text-muted-foreground">
+                        since {formatRelative(anomalySince)}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              ) : (
+                <p className="font-mono text-xs text-muted-foreground">
+                  No active fault. Service is in nominal state.
+                </p>
+              )
+            ) : (
+              <Skeleton className="h-9 w-full" />
+            )}
+          </section>
+
+          <section className="space-y-2">
+            <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-muted-foreground/80">
+              Knowledge Base
             </p>
             <ul className="space-y-1.5 font-mono text-xs text-muted-foreground">
-              <li>
-                · Last anomaly injected —{" "}
-                <span className="text-foreground/70">—</span>
+              <li className="flex items-baseline justify-between gap-3">
+                <span>· Linked runbooks</span>
+                {runbooksLoading ? (
+                  <Skeleton className="h-3 w-8" />
+                ) : (
+                  <span className="text-foreground/80 tabular-nums">
+                    {runbookCount ?? 0}
+                  </span>
+                )}
               </li>
-              <li>
-                · Pipeline runs today —{" "}
-                <span className="text-foreground/70">—</span>
-              </li>
-              <li>
-                · Linked runbooks —{" "}
-                <span className="text-foreground/70">—</span>
+              <li className="flex items-baseline justify-between gap-3">
+                <span>· Historical incidents</span>
+                {incidentsLoading ? (
+                  <Skeleton className="h-3 w-8" />
+                ) : (
+                  <span className="text-foreground/80 tabular-nums">
+                    {incidentCount ?? 0}
+                  </span>
+                )}
               </li>
             </ul>
           </section>
