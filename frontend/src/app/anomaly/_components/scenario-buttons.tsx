@@ -54,7 +54,7 @@ export function ScenarioButtons({
     onSuccess: (data) => {
       void queryClient.invalidateQueries({ queryKey: healthKeys.all });
       void queryClient.invalidateQueries({ queryKey: anomalyKeys.status() });
-      toast.success("Cascade scenario accepted.");
+      toast.success("Cascade scenario accepted. Charts reflect change after the next Prometheus scrape (~5–15 s).");
 
       const events =
         data.results

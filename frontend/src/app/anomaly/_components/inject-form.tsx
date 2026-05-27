@@ -122,7 +122,9 @@ export function InjectForm({
     onSuccess: (data) => {
       void queryClient.invalidateQueries({ queryKey: healthKeys.all });
       void queryClient.invalidateQueries({ queryKey: anomalyKeys.status() });
-      toast.success(`Injection accepted for ${selectedServiceLabel}.`);
+      toast.success(
+        `Injection accepted for ${selectedServiceLabel}. Charts reflect change after the next Prometheus scrape (~5–15 s).`,
+      );
       onInjected({
         id: buildEventId("inject"),
         kind: "inject",
