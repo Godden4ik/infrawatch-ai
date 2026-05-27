@@ -115,3 +115,94 @@ Secondary pages like `Evaluation` and `Providers` can stay accessible via sideba
 - Preserve user changes in dirty worktree. Do not revert unrelated edits.
 - When modernizing a page, migrate shell and primitives first, data flow second, visuals third.
 - If graph or chart library needs inline style values, source color from CSS variables where possible.
+
+## Color Tokens — Mandatory
+
+Use semantic tokens. Never use raw palette classes (`bg-emerald-500`, `text-red-400`, etc.) inside app UI. Authoritative tokens live in `src/app/globals.css`.
+
+### Status tokens (severity)
+
+| Token | Meaning | Tailwind classes (examples) |
+|-------|---------|------------------------------|
+| `--status-healthy` | Service / signal nominal | `bg-status-healthy`, `text-status-healthy`, `bg-status-healthy-soft` |
+| `--status-degraded` | Warning, partial degradation | `bg-status-degraded`, `text-status-degraded`, `bg-status-degraded-soft` |
+| `--status-critical` | Failure, outage, error | `bg-status-critical`, `text-status-critical`, `bg-status-critical-soft` |
+| `--status-unknown` | Unreachable / no signal | `bg-status-unknown`, `text-status-unknown`, `bg-status-unknown-soft` |
+
+`-soft` variants are pre-faded (14–16% alpha) for backgrounds. `border-status-*/20` etc. supported via slash opacity.
+
+### Brand tokens (identity)
+
+| Token | Meaning | Tailwind classes (examples) |
+|-------|---------|------------------------------|
+| `--brand` | Electric violet ~290° — InfraWatch accent | `bg-brand`, `text-brand`, `border-brand`, `bg-brand-soft` |
+| `--brand-soft` | Brand at low alpha for surfaces | `bg-brand-soft` |
+| `--brand-glow` | Brand at mid alpha for outer glow | inline `shadow-[0_0_18px_var(--brand-glow)]` |
+| `--primary` | Aliased to `--brand` | `bg-primary` resolves to brand |
+
+Brand is reserved for: active route indicator, primary CTA, focus rings, selected state in graphs, AI/agent affordances (LLM provider badges, streaming cursor).
+
+### Severity mapping reference
+
+When a domain status maps to severity:
+
+| Domain term | Use |
+|-------------|-----|
+| `healthy`, `nominal`, `online` | `healthy` |
+| `unhealthy`, `warn`, `degraded` | `degraded` |
+| `unreachable`, `down`, `error`, `failed` | `critical` |
+| `unknown`, missing data | `unknown` |
+
+## Motion Rules
+
+Library: `motion/react`. Variants live in `src/lib/motion-variants.ts`.
+
+| Variant | Intent | Where to use |
+|---------|--------|--------------|
+| `fadeInUp` | Subtle entrance, 2px lift + opacity, 180ms | Page sections, cards on mount via stagger |
+| `staggerContainer` | Parent of `fadeInUp` items, 20ms stagger / 30ms delay | `<PageMount>` |
+
+Contract:
+
+- All motion must read `useReducedMotion()` from `motion/react` and short-circuit when reduced.
+- No motion on live data values (latency, rate, error counters that change every 2s). Use crossfade or no animation.
+- Use `<AnimatedNumber>` for **stable** counters only (services online total, configured providers, pipeline runs today).
+- Never animate layout (height/width) in monitoring chrome. Transforms only.
+- No staggered entrance on `/topology` graph nodes — XYFlow owns that surface.
+
+## View Transition Naming Conventions
+
+Browser `view-transition-name` is reserved at three levels:
+
+| Name | Owner | Purpose |
+|------|-------|---------|
+| `header-shell` | `app/layout.tsx` — `<header>` | Persistent header chrome across navs |
+| `system-status` | `app/layout.tsx` — System Online pill | Anchors status indicator |
+| `active-tab-indicator` | `components/layout/core-route-tabs.tsx` — active tab inner span | Sliding indicator morph |
+| `node-${serviceId}` | `app/page.tsx` `ServiceCard`, `app/dashboard/page.tsx` per-service motion div, `app/topology/_components/topology-node.tsx` | Cross-page shared-element morph between health card and graph node |
+
+Rules:
+
+- Names must be **globally unique within a rendered DOM snapshot**. Don't reuse `node-api-gateway` on the same page.
+- Cross-page morph is automatic when both pages render the same name. Mismatched pages fall back to root crossfade — that's fine.
+- Next.js `experimental.viewTransition: true` is enabled (`next.config.mjs`). Routing wraps in `document.startViewTransition` automatically.
+- New names require a row added to this table.
+
+## Component Composition Table
+
+Beyond the layers already documented, the following project-local primitives exist:
+
+| Primitive | Location | Purpose |
+|-----------|----------|---------|
+| `StatusDot`, `StatusPill`, `StatusBar` | `components/ui/status-indicator.tsx` | Severity-driven indicators. Variants: `healthy` / `degraded` / `critical` / `unknown`. |
+| `AnimatedNumber` | `components/ui/animated-number.tsx` | Motion-eased count-up for stable counters. Respects reduced motion. |
+| `PageMount` | `components/layout/page-mount.tsx` | Wraps page root, staggers direct children fade-in on mount. Pass `className` for layout (`space-y-4`, `grid grid-cols-3`, etc.). |
+| `Card` (with `tone`) | `components/ui/card.tsx` | `tone="default" | "brand" | "critical" | "degraded" | "healthy"` — adjusts ring color + top-edge accent stroke. |
+
+## Stack Additions
+
+Add to the existing Stack table:
+
+| Layer | Technology |
+|-------|-----------|
+| View transitions | Next.js `experimental.viewTransition` (React 19 `<ViewTransition>` integration) |

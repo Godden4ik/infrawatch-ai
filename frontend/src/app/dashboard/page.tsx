@@ -63,6 +63,7 @@ export default function DashboardPage() {
               svc === "redis-cache" &&
                 "md:col-span-2 xl:col-span-3 2xl:col-span-4",
             )}
+            style={{ viewTransitionName: `node-${svc}` }}
             initial={{ opacity: 0, y: 16 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.35, delay: i * 0.06 }}

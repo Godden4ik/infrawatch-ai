@@ -120,7 +120,7 @@ export function ServiceMetrics({ serviceName, streamData }: ServiceMetricsProps)
     <Card
       className={cn(
         "h-full transition-colors",
-        serviceLevel === "warn" && "ring-1 ring-yellow-500/40",
+        serviceLevel === "warn" && "ring-1 ring-status-degraded/40",
         serviceLevel === "critical" && "ring-1 ring-destructive/50",
       )}
       size="sm"

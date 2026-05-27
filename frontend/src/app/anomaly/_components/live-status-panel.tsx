@@ -111,7 +111,7 @@ export function LiveStatusPanel() {
                         {anomalyType ? (
                           <ShieldAlert className="h-3.5 w-3.5 text-destructive" />
                         ) : (
-                          <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                          <span className="h-1.5 w-1.5 rounded-full bg-status-healthy" />
                         )}
                         {service}
                       </span>

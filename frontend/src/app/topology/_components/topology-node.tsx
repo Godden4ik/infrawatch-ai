@@ -22,19 +22,20 @@ export function TopologyNode({ data }: NodeProps) {
       className={cn(
         "relative min-w-[220px] border bg-card px-4 py-3 shadow-[0_12px_30px_rgba(0,0,0,0.22)] transition-colors",
         nodeData.selected
-          ? "border-primary text-foreground shadow-[0_0_0_1px_color-mix(in_oklab,var(--primary)_50%,transparent),0_12px_30px_rgba(0,0,0,0.22)]"
+          ? "border-brand/70 text-foreground"
           : nodeData.affected
-            ? "border-destructive/40 text-foreground"
+            ? "border-status-critical/50 text-foreground"
             : "border-border text-foreground",
       )}
+      style={{ viewTransitionName: `node-${nodeData.name}` }}
     >
       <span
         className={cn(
           "absolute inset-x-0 top-0 h-px",
           nodeData.selected
-            ? "bg-primary"
+            ? "bg-brand"
             : nodeData.affected
-              ? "bg-destructive/70"
+              ? "bg-status-critical/70"
               : "bg-border/80",
         )}
       />
@@ -59,10 +60,10 @@ export function TopologyNode({ data }: NodeProps) {
           className={cn(
             "mt-1 h-2.5 w-2.5 shrink-0 rounded-full",
             nodeData.selected
-              ? "bg-primary shadow-[0_0_12px_var(--primary)]"
+              ? "bg-brand"
               : nodeData.affected
-                ? "bg-destructive shadow-[0_0_8px_var(--destructive)]"
-                : "bg-chart-2 shadow-[0_0_10px_var(--chart-2)]",
+                ? "bg-status-critical"
+                : "bg-status-healthy",
           )}
         />
       </div>

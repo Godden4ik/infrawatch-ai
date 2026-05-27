@@ -12,15 +12,15 @@ const variantConfig: Record<
   success: {
     icon: <CheckCircle2 className="size-4 shrink-0" />,
     className:
-      "border-emerald-500/30 bg-emerald-950/80 text-emerald-300",
+      "border-status-healthy/30 bg-status-healthy-soft/80 text-status-healthy",
   },
   error: {
     icon: <AlertCircle className="size-4 shrink-0" />,
-    className: "border-red-500/30 bg-red-950/80 text-red-300",
+    className: "border-status-critical/30 bg-status-critical-soft/80 text-status-critical",
   },
   info: {
     icon: <Info className="size-4 shrink-0" />,
-    className: "border-blue-500/30 bg-blue-950/80 text-blue-300",
+    className: "border-brand/30 bg-brand-soft/80 text-brand",
   },
 };
 

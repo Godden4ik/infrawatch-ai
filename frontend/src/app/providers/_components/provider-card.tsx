@@ -50,14 +50,14 @@ function getConnectionFailureMessage(error: string | undefined) {
 function StatusBadge({ configured, requiresKey }: { configured: boolean; requiresKey: boolean }) {
   if (configured) {
     return (
-      <Badge className="bg-emerald-500/10 text-emerald-400 border-transparent text-[10px] font-medium uppercase tracking-wider">
+      <Badge className="bg-status-healthy-soft text-status-healthy border-transparent text-[10px] font-medium uppercase tracking-wider">
         Configured
       </Badge>
     );
   }
   if (!requiresKey) {
     return (
-      <Badge className="bg-blue-500/10 text-blue-400 border-transparent text-[10px] font-medium uppercase tracking-wider">
+      <Badge className="bg-brand-soft text-brand border-transparent text-[10px] font-medium uppercase tracking-wider">
         Local
       </Badge>
     );
@@ -85,14 +85,14 @@ function HealthResult({
 
   if (result.status === "healthy") {
     return (
-      <span className="font-mono text-[10px] text-emerald-500">
+      <span className="font-mono text-[10px] text-status-healthy">
         {result.latency_ms}ms
       </span>
     );
   }
   if (result.status === "no_key") {
     return (
-      <span className="font-mono text-[10px] text-amber-500">no key set</span>
+      <span className="font-mono text-[10px] text-status-degraded">no key set</span>
     );
   }
   return (
@@ -135,7 +135,7 @@ function ConnectionTestButton({
         data-testid={`connection-indicator-${providerId}`}
         className={cn(
           "inline-flex items-center justify-center text-muted-foreground transition-colors",
-          state === "success" && "text-emerald-500",
+          state === "success" && "text-status-healthy",
           state === "error" && "text-destructive",
         )}
       >

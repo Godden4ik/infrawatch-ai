@@ -88,7 +88,7 @@ export function StatRow({
       <StatCard
         label="Healthy"
         value={
-          <span className={healthy > 0 ? "text-emerald-500" : "text-muted-foreground"}>
+          <span className={healthy > 0 ? "text-status-healthy" : "text-muted-foreground"}>
             {healthy}
           </span>
         }

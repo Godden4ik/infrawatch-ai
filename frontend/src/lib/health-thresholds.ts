@@ -63,15 +63,15 @@ export const LEVEL_BADGE: Record<
 > = {
   healthy: {
     label: "Healthy",
-    className: "border-primary/20 bg-primary/10 text-primary",
+    className: "border-status-healthy/30 bg-status-healthy-soft text-status-healthy",
   },
   warn: {
     label: "Degraded",
-    className: "border-yellow-500/30 bg-yellow-500/10 text-yellow-400",
+    className: "border-status-degraded/30 bg-status-degraded-soft text-status-degraded",
   },
   critical: {
     label: "Critical",
-    className: "border-destructive/30 bg-destructive/10 text-destructive",
+    className: "border-status-critical/30 bg-status-critical-soft text-status-critical",
   },
 };
 

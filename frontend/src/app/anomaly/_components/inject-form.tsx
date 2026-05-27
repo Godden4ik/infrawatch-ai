@@ -76,8 +76,8 @@ function buildEventId(prefix: string) {
 }
 
 function statusDot(status: HealthResponse["services"][string] | undefined) {
-  if (status === "healthy") return "bg-emerald-500";
-  if (status === "unhealthy") return "bg-amber-500";
+  if (status === "healthy") return "bg-status-healthy";
+  if (status === "unhealthy") return "bg-status-degraded";
   return "bg-muted-foreground";
 }
 

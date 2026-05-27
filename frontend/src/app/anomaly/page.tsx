@@ -34,8 +34,8 @@ function buildEventId(prefix: string) {
 }
 
 function statusDot(status: "healthy" | "unhealthy" | "unreachable" | undefined) {
-  if (status === "healthy") return "bg-emerald-500";
-  if (status === "unhealthy") return "bg-amber-500";
+  if (status === "healthy") return "bg-status-healthy";
+  if (status === "unhealthy") return "bg-status-degraded";
   return "bg-muted-foreground";
 }
 
@@ -461,7 +461,7 @@ export default function AnomalyPage() {
       </div>
 
       {data?.status === "degraded" ? (
-        <div className="flex items-center gap-2 bg-amber-500/10 px-3 py-2 font-mono text-[11px] text-amber-500 ring-1 ring-inset ring-amber-500/20">
+        <div className="flex items-center gap-2 bg-status-degraded-soft px-3 py-2 font-mono text-[11px] text-status-degraded ring-1 ring-inset ring-status-degraded/20">
           <AlertTriangle className="h-3.5 w-3.5" />
           System already degraded. New injections stack on top of live instability.
         </div>

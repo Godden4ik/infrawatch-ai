@@ -226,15 +226,15 @@ export function TopologyGraph({
         <div className="border border-border/80 bg-background/92 px-2.5 py-1.5 backdrop-blur-sm">
           <div className="flex items-center gap-3 font-mono text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
             <span className="inline-flex items-center gap-1.5">
-              <span className="h-2 w-2 rounded-full bg-chart-2" />
+              <span className="h-2 w-2 rounded-full bg-status-healthy" />
               Normal
             </span>
             <span className="inline-flex items-center gap-1.5">
-              <span className="h-2 w-2 rounded-full bg-primary" />
+              <span className="h-2 w-2 rounded-full bg-brand" />
               Selected
             </span>
             <span className="inline-flex items-center gap-1.5">
-              <span className="h-2 w-2 rounded-full bg-destructive" />
+              <span className="h-2 w-2 rounded-full bg-status-critical" />
               Affected
             </span>
           </div>

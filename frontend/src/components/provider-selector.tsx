@@ -198,12 +198,12 @@ export function ProviderSelector({
                   <Lock className="relative z-10 h-3 w-3 shrink-0 text-muted-foreground" />
                 )}
                 {cachedHealth?.status === "healthy" && (
-                  <span className="relative z-10 h-1.5 w-1.5 shrink-0 rounded-full bg-green-500" />
+                  <span className="relative z-10 h-1.5 w-1.5 shrink-0 rounded-full bg-status-healthy" />
                 )}
                 {cachedHealth &&
                   cachedHealth.status !== "healthy" &&
                   cachedHealth.status !== "no_key" && (
-                    <span className="relative z-10 h-1.5 w-1.5 shrink-0 rounded-full bg-red-500" />
+                    <span className="relative z-10 h-1.5 w-1.5 shrink-0 rounded-full bg-status-critical" />
                   )}
                 {isCheckingHealth && isActive && (
                   <Loader2 className="relative z-10 h-3 w-3 shrink-0 animate-spin" />
@@ -284,7 +284,7 @@ export function ProviderSelector({
           ) : (
             <div className="bg-secondary/60 flex items-center justify-between rounded-lg px-3 py-2 text-xs">
               <div className="flex items-center gap-2 text-muted-foreground">
-                <KeyRound className="h-3 w-3 text-green-500" />
+                <KeyRound className="h-3 w-3 text-status-healthy" />
                 <span>Session key active</span>
               </div>
               <button

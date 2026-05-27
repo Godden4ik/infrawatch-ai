@@ -1,49 +1,74 @@
 import { describe, it, expect } from "vitest";
 import { render } from "@testing-library/react";
-import { StatusIndicator } from "@/components/layout/status-indicator";
+import { StatusDot, StatusPill, StatusBar } from "@/components/ui/status-indicator";
 
-describe("StatusIndicator", () => {
-  it("renders without crashing", () => {
-    const { container } = render(<StatusIndicator status="healthy" />);
-    expect(container.firstChild).not.toBeNull();
-  });
-
-  it("renders a span element", () => {
-    const { container } = render(<StatusIndicator status="healthy" />);
-    expect(container.querySelector("span")).not.toBeNull();
-  });
-
-  it("applies emerald color class for healthy status", () => {
-    const { container } = render(<StatusIndicator status="healthy" />);
+describe("StatusDot", () => {
+  it("renders a span with healthy token class", () => {
+    const { container } = render(<StatusDot variant="healthy" />);
     const span = container.querySelector("span")!;
-    expect(span.className).toContain("bg-emerald-500");
+    expect(span).not.toBeNull();
+    expect(span.className).toContain("bg-status-healthy");
   });
 
-  it("applies amber color class for unhealthy status", () => {
-    const { container } = render(<StatusIndicator status="unhealthy" />);
-    const span = container.querySelector("span")!;
-    expect(span.className).toContain("bg-amber-500");
+  it("uses degraded token class for degraded variant", () => {
+    const { container } = render(<StatusDot variant="degraded" />);
+    expect(container.querySelector("span")!.className).toContain(
+      "bg-status-degraded",
+    );
   });
 
-  it("applies red color class for unreachable status", () => {
-    const { container } = render(<StatusIndicator status="unreachable" />);
-    const span = container.querySelector("span")!;
-    expect(span.className).toContain("bg-red-500");
+  it("uses critical token class for critical variant", () => {
+    const { container } = render(<StatusDot variant="critical" />);
+    expect(container.querySelector("span")!.className).toContain(
+      "bg-status-critical",
+    );
   });
 
-  it("applies sm size classes by default", () => {
-    const { container } = render(<StatusIndicator status="healthy" />);
-    const span = container.querySelector("span")!;
-    expect(span.className).toContain("h-2");
-    expect(span.className).toContain("w-2");
+  it("uses unknown token class for unknown variant", () => {
+    const { container } = render(<StatusDot variant="unknown" />);
+    expect(container.querySelector("span")!.className).toContain(
+      "bg-status-unknown",
+    );
+  });
+
+  it("applies sm size by default", () => {
+    const { container } = render(<StatusDot variant="healthy" />);
+    const cls = container.querySelector("span")!.className;
+    expect(cls).toContain("h-2");
+    expect(cls).toContain("w-2");
   });
 
   it("applies md size classes when size=md", () => {
-    const { container } = render(
-      <StatusIndicator status="healthy" size="md" />,
+    const { container } = render(<StatusDot variant="healthy" size="md" />);
+    const cls = container.querySelector("span")!.className;
+    expect(cls).toContain("h-2.5");
+    expect(cls).toContain("w-2.5");
+  });
+
+  it("adds pulse class when pulse=true", () => {
+    const { container } = render(<StatusDot variant="critical" pulse />);
+    expect(container.querySelector("span")!.className).toContain("animate-pulse");
+  });
+});
+
+describe("StatusPill", () => {
+  it("renders children with variant surface", () => {
+    const { container, getByText } = render(
+      <StatusPill variant="degraded">Warning</StatusPill>,
     );
-    const span = container.querySelector("span")!;
-    expect(span.className).toContain("h-2.5");
-    expect(span.className).toContain("w-2.5");
+    expect(getByText("Warning")).not.toBeNull();
+    expect(container.firstChild).not.toBeNull();
+    const pill = container.firstChild as HTMLElement;
+    expect(pill.className).toContain("bg-status-degraded-soft");
+    expect(pill.className).toContain("text-status-degraded");
+  });
+});
+
+describe("StatusBar", () => {
+  it("renders a left-edge accent strip with variant color", () => {
+    const { container } = render(<StatusBar variant="critical" />);
+    const bar = container.firstChild as HTMLElement;
+    expect(bar.className).toContain("bg-status-critical");
+    expect(bar.className).toContain("w-[3px]");
   });
 });
