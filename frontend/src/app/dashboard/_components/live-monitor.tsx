@@ -3,7 +3,7 @@
 import { motion } from "motion/react";
 import { Radio, Wifi, WifiOff } from "lucide-react";
 import { useMetricsStream } from "@/hooks/use-metrics-stream";
-import { METRIC_GROUPS } from "@/lib/metric-registry";
+import { METRIC_GROUPS, getMetricColorVar } from "@/lib/metric-registry";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { LiveChart } from "./live-chart";
@@ -69,7 +69,7 @@ export function LiveMonitor() {
                   label={metric.label}
                   metricKey={metric.key}
                   points={serviceData[metric.key] ?? []}
-                  colorVar={group.colorVar}
+                  colorVar={getMetricColorVar(metric)}
                   format={metric.format}
                 />
               ))}

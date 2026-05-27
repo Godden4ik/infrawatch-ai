@@ -116,7 +116,7 @@ describe("ProviderCard connection testing", () => {
     await waitFor(() => {
       expect(
         screen.getByTestId("connection-indicator-anthropic"),
-      ).toHaveClass("text-emerald-500");
+      ).toHaveClass("text-status-healthy");
     });
 
     await act(async () => {

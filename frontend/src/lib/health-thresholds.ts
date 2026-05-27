@@ -51,10 +51,15 @@ export function evaluateMetric(
   return "healthy";
 }
 
-export const LEVEL_COLORS: Record<HealthLevel, { color: string; areaColor: string }> = {
-  healthy: { color: "#4ade80", areaColor: "rgba(74, 222, 128, 0.18)" },
-  warn: { color: "#facc15", areaColor: "rgba(250, 204, 21, 0.22)" },
-  critical: { color: "#f87171", areaColor: "rgba(248, 113, 113, 0.24)" },
+// CSS variable names. Resolved at render time in chart components (SVG attrs
+// don't accept var()). Use the helper in metric-chart.tsx for resolution.
+export const LEVEL_COLORS: Record<
+  HealthLevel,
+  { colorVar: string; areaVar: string }
+> = {
+  healthy: { colorVar: "--status-healthy", areaVar: "--status-healthy-soft" },
+  warn: { colorVar: "--status-degraded", areaVar: "--status-degraded-soft" },
+  critical: { colorVar: "--status-critical", areaVar: "--status-critical-soft" },
 };
 
 export const LEVEL_BADGE: Record<
@@ -63,15 +68,15 @@ export const LEVEL_BADGE: Record<
 > = {
   healthy: {
     label: "Healthy",
-    className: "border-primary/20 bg-primary/10 text-primary",
+    className: "border-status-healthy/30 bg-status-healthy-soft text-status-healthy",
   },
   warn: {
     label: "Degraded",
-    className: "border-yellow-500/30 bg-yellow-500/10 text-yellow-400",
+    className: "border-status-degraded/30 bg-status-degraded-soft text-status-degraded",
   },
   critical: {
     label: "Critical",
-    className: "border-destructive/30 bg-destructive/10 text-destructive",
+    className: "border-status-critical/30 bg-status-critical-soft text-status-critical",
   },
 };
 

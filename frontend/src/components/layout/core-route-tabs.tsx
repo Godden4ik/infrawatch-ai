@@ -35,33 +35,51 @@ const NAV_TABS = [
   { href: "/providers", label: "Providers", icon: KeyRound },
 ] as const;
 
-function isActivePath(pathname: string, href: string) {
+function matchesPath(pathname: string, href: string) {
   if (href === "/") return pathname === "/";
-  return pathname.startsWith(href);
+  if (pathname === href) return true;
+  return pathname.startsWith(href + "/");
+}
+
+function pickActiveHref(pathname: string) {
+  let best: string | null = null;
+  for (const tab of NAV_TABS) {
+    if (!matchesPath(pathname, tab.href)) continue;
+    if (best === null || tab.href.length > best.length) best = tab.href;
+  }
+  return best;
 }
 
 export function CoreRouteTabs() {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
-  const activeTab = NAV_TABS.find((tab) => isActivePath(pathname, tab.href));
+  const activeHref = pickActiveHref(pathname);
+  const activeTab = NAV_TABS.find((tab) => tab.href === activeHref);
 
   return (
     <div className="border-t border-border/60 px-6 py-2">
       <div className="hidden min-w-0 items-center gap-1 overflow-x-auto md:flex [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {NAV_TABS.map((tab) => {
-          const active = isActivePath(pathname, tab.href);
+          const active = tab.href === activeHref;
 
           return (
             <Link
               key={tab.href}
               href={tab.href}
               className={cn(
-                "inline-flex h-9 shrink-0 items-center gap-2 border px-3 text-[11px] font-medium tracking-[0.14em] uppercase transition-colors",
+                "relative isolate inline-flex h-9 shrink-0 items-center gap-2 border border-transparent px-3 text-[11px] font-medium tracking-[0.14em] uppercase transition-colors",
                 active
-                  ? "border-border bg-card text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]"
-                  : "border-transparent text-muted-foreground hover:border-border/70 hover:bg-card/50 hover:text-foreground",
+                  ? "text-foreground"
+                  : "text-muted-foreground hover:border-border/70 hover:bg-card/50 hover:text-foreground",
               )}
             >
+              {active && (
+                <span
+                  aria-hidden
+                  className="pointer-events-none absolute inset-0 -z-10 border border-border bg-card shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]"
+                  style={{ viewTransitionName: "active-tab-indicator" }}
+                />
+              )}
               <tab.icon className="h-3.5 w-3.5 shrink-0" />
               <span className="whitespace-nowrap">{tab.label}</span>
             </Link>
@@ -101,7 +119,7 @@ export function CoreRouteTabs() {
 
           <div className="flex flex-1 flex-col gap-2 p-4">
             {NAV_TABS.map((tab) => {
-              const active = isActivePath(pathname, tab.href);
+              const active = tab.href === activeHref;
 
               return (
                 <Link

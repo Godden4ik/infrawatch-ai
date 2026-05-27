@@ -15,6 +15,7 @@ import "@xyflow/react/dist/style.css";
 import { topologyQueryOptions } from "@/services/graph/query-options";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
+import { StatusPill } from "@/components/ui/status-indicator";
 import { AlertTriangle, RefreshCw } from "lucide-react";
 import {
   TopologyEdge,
@@ -158,7 +159,7 @@ export function TopologyGraph({
       <style>{`
         @keyframes topology-dash {
           to {
-            stroke-dashoffset: -48;
+            stroke-dashoffset: -32;
           }
         }
 
@@ -167,20 +168,30 @@ export function TopologyGraph({
           stroke: var(--muted-foreground);
           stroke-opacity: 0.42;
           stroke-width: 1.75;
-          stroke-dasharray: 4 7;
-          animation: topology-dash 14s linear infinite;
+          stroke-dasharray: 4 6;
+          animation: topology-dash 1.6s linear infinite;
         }
 
         .topology-edge-path--selected {
-          stroke: var(--primary);
-          stroke-opacity: 0.9;
-          animation-duration: 8s;
+          stroke: var(--brand);
+          stroke-opacity: 0.95;
+          stroke-width: 2;
+          animation-duration: 0.9s;
         }
 
         .topology-edge-path--affected {
-          stroke: var(--destructive);
-          stroke-opacity: 0.72;
-          animation-duration: 6s;
+          stroke: var(--status-critical);
+          stroke-opacity: 0.82;
+          stroke-width: 2;
+          animation-duration: 0.7s;
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+          .topology-edge-path,
+          .topology-edge-path--selected,
+          .topology-edge-path--affected {
+            animation: none !important;
+          }
         }
 
         .react-flow__controls {
@@ -226,19 +237,24 @@ export function TopologyGraph({
         <div className="border border-border/80 bg-background/92 px-2.5 py-1.5 backdrop-blur-sm">
           <div className="flex items-center gap-3 font-mono text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
             <span className="inline-flex items-center gap-1.5">
-              <span className="h-2 w-2 rounded-full bg-chart-2" />
+              <span className="h-2 w-2 rounded-full bg-status-healthy" />
               Normal
             </span>
             <span className="inline-flex items-center gap-1.5">
-              <span className="h-2 w-2 rounded-full bg-primary" />
+              <span className="h-2 w-2 rounded-full bg-brand" />
               Selected
             </span>
             <span className="inline-flex items-center gap-1.5">
-              <span className="h-2 w-2 rounded-full bg-destructive" />
+              <span className="h-2 w-2 rounded-full bg-status-critical" />
               Affected
             </span>
           </div>
         </div>
+        {affectedServices.length > 0 ? (
+          <StatusPill variant="critical">
+            {affectedServices.length} services affected
+          </StatusPill>
+        ) : null}
       </div>
 
       <ReactFlow<TopologyGraphNode, TopologyGraphEdge>

@@ -10,8 +10,8 @@
     --card-foreground: oklch(0.141 0.005 285.823);
     --popover: oklch(1 0 0);
     --popover-foreground: oklch(0.141 0.005 285.823);
-    --primary: oklch(0.488 0.243 264.376);
-    --primary-foreground: oklch(0.97 0.014 254.604);
+    --primary: oklch(0.58 0.22 290);
+    --primary-foreground: oklch(0.985 0 0);
     --secondary: oklch(0.967 0.001 286.375);
     --secondary-foreground: oklch(0.21 0.006 285.885);
     --muted: oklch(0.967 0.001 286.375);
@@ -48,6 +48,23 @@
     --sidebar-ring: oklch(0.705 0.015 286.067);
     --background: oklch(1 0 0);
     --foreground: oklch(0.141 0.005 285.823);
+
+    /* Brand */
+    --brand: oklch(0.58 0.22 290);
+    --brand-foreground: oklch(0.985 0 0);
+    --brand-soft: oklch(0.58 0.22 290 / 0.12);
+    --brand-glow: oklch(0.58 0.22 290 / 0.28);
+    --ring: oklch(0.58 0.22 290 / 0.55);
+
+    /* Status (semantic aliases over --metric-*) */
+    --status-healthy: var(--metric-success);
+    --status-healthy-soft: var(--metric-success-soft);
+    --status-degraded: var(--metric-warning);
+    --status-degraded-soft: var(--metric-warning-soft);
+    --status-critical: var(--metric-error);
+    --status-critical-soft: var(--metric-error-soft);
+    --status-unknown: oklch(0.6 0.02 285);
+    --status-unknown-soft: oklch(0.6 0.02 285 / 0.1);
 }
 
 /* ─── Mission Control: Dark mode (primary) ─── */
@@ -58,8 +75,8 @@
     --card-foreground: oklch(0.985 0 0);
     --popover: oklch(0.215 0.006 285.885);
     --popover-foreground: oklch(0.985 0 0);
-    --primary: oklch(0.55 0.199 265.638);
-    --primary-foreground: oklch(0.97 0.014 254.604);
+    --primary: oklch(0.66 0.21 290);
+    --primary-foreground: oklch(0.985 0 0);
     --secondary: oklch(0.274 0.006 286.033);
     --secondary-foreground: oklch(0.985 0 0);
     --muted: oklch(0.274 0.006 286.033);
@@ -93,6 +110,23 @@
     --sidebar-accent-foreground: oklch(0.985 0 0);
     --sidebar-border: oklch(1 0 0 / 10%);
     --sidebar-ring: oklch(0.552 0.016 285.938);
+
+    /* Brand */
+    --brand: oklch(0.66 0.21 290);
+    --brand-foreground: oklch(0.985 0 0);
+    --brand-soft: oklch(0.66 0.21 290 / 0.14);
+    --brand-glow: oklch(0.66 0.21 290 / 0.35);
+    --ring: oklch(0.66 0.21 290 / 0.6);
+
+    /* Status (semantic aliases over --metric-*) */
+    --status-healthy: var(--metric-success);
+    --status-healthy-soft: var(--metric-success-soft);
+    --status-degraded: var(--metric-warning);
+    --status-degraded-soft: var(--metric-warning-soft);
+    --status-critical: var(--metric-error);
+    --status-critical-soft: var(--metric-error-soft);
+    --status-unknown: oklch(0.55 0.02 285);
+    --status-unknown-soft: oklch(0.55 0.02 285 / 0.14);
 }
 
 @theme inline {
@@ -131,6 +165,17 @@
     --color-background: var(--background);
     --color-success: oklch(0.696 0.17 162);
     --color-warning: oklch(0.769 0.188 85);
+    --color-brand: var(--brand);
+    --color-brand-foreground: var(--brand-foreground);
+    --color-brand-soft: var(--brand-soft);
+    --color-status-healthy: var(--status-healthy);
+    --color-status-healthy-soft: var(--status-healthy-soft);
+    --color-status-degraded: var(--status-degraded);
+    --color-status-degraded-soft: var(--status-degraded-soft);
+    --color-status-critical: var(--status-critical);
+    --color-status-critical-soft: var(--status-critical-soft);
+    --color-status-unknown: var(--status-unknown);
+    --color-status-unknown-soft: var(--status-unknown-soft);
     --radius-sm: calc(var(--radius) * 0.6);
     --radius-md: calc(var(--radius) * 0.8);
     --radius-lg: var(--radius);
@@ -147,6 +192,17 @@
   }
   body {
     @apply bg-background text-foreground;
+    background-image:
+      linear-gradient(to right, oklch(1 0 0 / 0.035) 1px, transparent 1px),
+      linear-gradient(to bottom, oklch(1 0 0 / 0.035) 1px, transparent 1px);
+    background-size: 32px 32px;
+    background-position: -1px -1px;
+    background-attachment: fixed;
+  }
+  :root:not(.dark) body {
+    background-image:
+      linear-gradient(to right, oklch(0 0 0 / 0.04) 1px, transparent 1px),
+      linear-gradient(to bottom, oklch(0 0 0 / 0.04) 1px, transparent 1px);
   }
   html {
     @apply font-sans;
@@ -154,5 +210,36 @@
   button:not(:disabled),
   [role="button"]:not(:disabled) {
     cursor: pointer;
+  }
+}
+
+@keyframes view-transition-fade-in {
+  from { opacity: 0; }
+}
+
+@keyframes view-transition-fade-out {
+  to { opacity: 0; }
+}
+
+@keyframes view-transition-slide-in {
+  from { opacity: 0; transform: translateY(6px); }
+}
+
+@keyframes view-transition-slide-out {
+  to { opacity: 0; transform: translateY(-6px); }
+}
+
+::view-transition-old(root) {
+  animation: 160ms cubic-bezier(0.4, 0, 1, 1) both view-transition-slide-out;
+}
+
+::view-transition-new(root) {
+  animation: 220ms cubic-bezier(0, 0, 0.2, 1) 40ms both view-transition-slide-in;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-old(root),
+  ::view-transition-new(root) {
+    animation: none;
   }
 }

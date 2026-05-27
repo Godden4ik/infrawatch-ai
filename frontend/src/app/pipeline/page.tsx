@@ -33,6 +33,9 @@ import {
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { StatusPill, type StatusVariant } from "@/components/ui/status-indicator";
+import { PageHeader, PageMetaCell } from "@/components/layout/page-header";
+import { PageMount } from "@/components/layout/page-mount";
 import { cn } from "@/lib/utils";
 import { PipelineControls } from "./_components/pipeline-controls";
 import { PipelineViewer } from "./_components/pipeline-viewer";
@@ -143,17 +146,27 @@ function getStageSummary(state: PipelineState | undefined) {
   };
 }
 
-function statusBadgeVariant(status: PipelineState["status"] | undefined) {
-  if (status === "running") return "default";
-  if (status === "complete") return "outline";
-  if (status === "error") return "destructive";
-  return "outline";
+function pipelineStatusVariant(
+  status: PipelineState["status"] | undefined,
+): StatusVariant {
+  if (status === "running") return "degraded";
+  if (status === "complete") return "healthy";
+  if (status === "error") return "critical";
+  return "unknown";
+}
+
+function stageStatusVariant(
+  state: "complete" | "running" | "standby",
+): StatusVariant {
+  if (state === "complete") return "healthy";
+  if (state === "running") return "degraded";
+  return "unknown";
 }
 
 function statusTone(status: PipelineState["status"] | undefined) {
-  if (status === "running") return "text-primary";
-  if (status === "complete") return "text-success";
-  if (status === "error") return "text-destructive";
+  if (status === "running") return "text-status-degraded";
+  if (status === "complete") return "text-status-healthy";
+  if (status === "error") return "text-status-critical";
   return "text-muted-foreground";
 }
 
@@ -194,16 +207,12 @@ function ProgressRail({ state }: { state: PipelineState | undefined }) {
           Monitor verifies signal. Analyst narrows topology. Responder drafts action.
         </CardDescription>
         <CardAction>
-          <Badge
-            variant={statusBadgeVariant(state?.status)}
-            className={cn(
-              "font-mono text-[10px] uppercase tracking-[0.14em]",
-              state?.status === "running" && "bg-primary/10 text-primary",
-              state?.status === "complete" && "text-success",
-            )}
+          <StatusPill
+            variant={pipelineStatusVariant(state?.status)}
+            pulse={state?.status === "running"}
           >
             {state?.status ?? "idle"}
-          </Badge>
+          </StatusPill>
         </CardAction>
       </CardHeader>
 
@@ -258,15 +267,18 @@ function ProgressRail({ state }: { state: PipelineState | undefined }) {
                   </div>
 
                   <div className="flex items-center justify-between">
-                    <span
-                      className={cn(
-                        "font-mono text-[10px] uppercase tracking-[0.14em] text-muted-foreground",
-                        complete && "text-success",
-                        running && step.accent,
-                      )}
-                    >
-                      {complete ? "complete" : running ? "running" : "standby"}
-                    </span>
+                    {(() => {
+                      const stageState: "complete" | "running" | "standby" =
+                        complete ? "complete" : running ? "running" : "standby";
+                      return (
+                        <StatusPill
+                          variant={stageStatusVariant(stageState)}
+                          pulse={!!running}
+                        >
+                          {stageState}
+                        </StatusPill>
+                      );
+                    })()}
                     {running ? (
                       <motion.span
                         className={cn("h-1.5 w-1.5", step.marker)}
@@ -327,48 +339,32 @@ export default function PipelinePage() {
   }
 
   return (
-    <motion.div
-      className="mx-auto max-w-6xl space-y-4"
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      transition={{ duration: 0.25 }}
-    >
-      <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
-        <div>
-          <h1 className="text-base font-semibold">Agent Pipeline</h1>
-          <p className="text-xs text-muted-foreground">
-            Split-pane runtime for streaming detection, topology analysis, and response planning.
-          </p>
-        </div>
-
-        <div className="grid grid-cols-3 gap-2 font-mono text-[11px] text-muted-foreground">
-          <div className="bg-card/50 px-3 py-2 ring-1 ring-inset ring-border/70">
-            <div className="tracking-[0.16em] uppercase">Status</div>
-            <div className="mt-1 text-sm font-semibold text-foreground">
-              {state?.status ?? "idle"}
-            </div>
-          </div>
-          <div className="bg-card/50 px-3 py-2 ring-1 ring-inset ring-border/70">
-            <div className="tracking-[0.16em] uppercase">Agents</div>
-            <div className="mt-1 text-sm font-semibold text-foreground">
-              {summary.completeCount}/{STEP_CONFIG.length}
-            </div>
-          </div>
-          <div className="bg-card/50 px-3 py-2 ring-1 ring-inset ring-border/70">
-            <div className="tracking-[0.16em] uppercase">Transport</div>
-            <Badge
-              variant="outline"
-              className={cn(
-                "mt-1 font-mono text-[11px]",
-                transportCfg.className,
-              )}
-            >
-              <TransportIcon className="mr-1 h-3 w-3" />
-              {transportCfg.label}
-            </Badge>
-          </div>
-        </div>
-      </div>
+    <PageMount className="mx-auto max-w-6xl space-y-4">
+      <PageHeader
+        title="Agent Pipeline"
+        description="Split-pane runtime for streaming detection, topology analysis, and response planning."
+        meta={
+          <>
+            <PageMetaCell label="Status" value={state?.status ?? "idle"} />
+            <PageMetaCell
+              label="Agents"
+              value={`${summary.completeCount}/${STEP_CONFIG.length}`}
+            />
+            <PageMetaCell
+              label="Transport"
+              value={
+                <Badge
+                  variant="outline"
+                  className={cn("font-mono text-[11px]", transportCfg.className)}
+                >
+                  <TransportIcon className="mr-1 h-3 w-3" />
+                  {transportCfg.label}
+                </Badge>
+              }
+            />
+          </>
+        }
+      />
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <StatCard
@@ -434,6 +430,6 @@ export default function PipelinePage() {
         </div>
         <PipelineViewer state={state} />
       </div>
-    </motion.div>
+    </PageMount>
   );
 }

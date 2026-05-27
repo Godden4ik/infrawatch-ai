@@ -9,6 +9,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
+import { StatusBar, StatusDot } from "@/components/ui/status-indicator";
 import { Zap, BookOpen, AlertTriangle, RefreshCw } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -77,20 +78,20 @@ export function BlastRadiusPanel({ service }: BlastRadiusPanelProps) {
               <p className="font-mono text-[10px] tracking-[0.16em] uppercase text-muted-foreground">
                 {blastRadius.data.affected_services.length} affected services
               </p>
-              <div className="flex flex-wrap gap-1.5">
+              <div className="flex flex-col gap-1.5">
                 {blastRadius.data.affected_services.map((item, index) => (
                   <motion.div
                     key={item}
-                    initial={{ opacity: 0, scale: 0.9 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    transition={{ delay: index * 0.05 }}
+                    initial={{ opacity: 0, y: 4 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: index * 0.04 }}
+                    className="relative flex items-center gap-2.5 border border-border/70 bg-muted/30 py-1.5 pr-2.5 pl-3"
                   >
-                    <Badge
-                      variant="destructive"
-                      className="font-mono text-[10px] uppercase"
-                    >
+                    <StatusBar variant="critical" />
+                    <StatusDot variant="critical" />
+                    <span className="font-mono text-sm text-foreground">
                       {item}
-                    </Badge>
+                    </span>
                   </motion.div>
                 ))}
               </div>

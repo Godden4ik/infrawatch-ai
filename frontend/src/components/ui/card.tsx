@@ -2,17 +2,33 @@ import * as React from "react"
 
 import { cn } from "@/lib/utils"
 
+type CardTone = "default" | "brand" | "critical" | "degraded" | "healthy";
+
+const toneRing: Record<CardTone, string> = {
+  default: "ring-foreground/10",
+  brand: "ring-brand/20",
+  critical: "ring-status-critical/20",
+  degraded: "ring-status-degraded/20",
+  healthy: "ring-status-healthy/20",
+};
+
 function Card({
   className,
   size = "default",
+  tone = "default",
   ...props
-}: React.ComponentProps<"div"> & { size?: "default" | "sm" }) {
+}: React.ComponentProps<"div"> & {
+  size?: "default" | "sm";
+  tone?: CardTone;
+}) {
   return (
     <div
       data-slot="card"
       data-size={size}
+      data-tone={tone}
       className={cn(
-        "group/card flex flex-col gap-4 overflow-hidden rounded-none bg-card py-4 text-xs/relaxed text-card-foreground ring-1 ring-foreground/10 has-data-[slot=card-footer]:pb-0 has-[>img:first-child]:pt-0 data-[size=sm]:gap-2 data-[size=sm]:py-3 data-[size=sm]:has-data-[slot=card-footer]:pb-0 *:[img:first-child]:rounded-none *:[img:last-child]:rounded-none",
+        "group/card relative flex flex-col gap-4 overflow-hidden rounded-none bg-card py-4 text-xs/relaxed text-card-foreground ring-1 has-data-[slot=card-footer]:pb-0 has-[>img:first-child]:pt-0 data-[size=sm]:gap-2 data-[size=sm]:py-3 data-[size=sm]:has-data-[slot=card-footer]:pb-0 *:[img:first-child]:rounded-none *:[img:last-child]:rounded-none",
+        toneRing[tone],
         className
       )}
       {...props}

@@ -2,51 +2,48 @@
 
 import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { motion } from "motion/react";
 import { healthQueryOptions } from "@/services/health/query-options";
 import { providerQueries } from "@/services/providers/query-options";
 import { getKeyStatus } from "@/services/providers/actions";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
+  StatusDot,
+  StatusPill,
+  type StatusVariant,
+} from "@/components/ui/status-indicator";
+import { AnimatedNumber } from "@/components/ui/animated-number";
+import { PageMount } from "@/components/layout/page-mount";
+import { PageHeader } from "@/components/layout/page-header";
+import {
   Shield,
   CreditCard,
   User,
   Package,
   Server,
-  Activity,
   CheckCircle2,
   AlertTriangle,
   XCircle,
+  ExternalLink,
 } from "lucide-react";
-import { SiRedis, SiPrometheus, SiNeo4J } from "react-icons/si";
+import { SiRedis } from "react-icons/si";
+import { EXTERNAL_SERVICES } from "@/lib/external-services";
+import {
+  ServiceDetailSheet,
+  type ServiceDetailSheetService,
+} from "@/app/_components/service-detail-sheet";
 import type { ComponentType, SVGProps } from "react";
 
-// ─── Icon mapping ─────────────────────────────────────────────────────────────
-
-type LucideIconProps = {
-  className?: string;
-  size?: number | string;
-};
+type LucideIconProps = { className?: string; size?: number | string };
 type SiIconProps = SVGProps<SVGSVGElement> & { className?: string };
+type IconComponent = ComponentType<LucideIconProps | SiIconProps>;
 
-const MICROSERVICE_ICONS: Record<
-  string,
-  ComponentType<LucideIconProps | SiIconProps>
-> = {
-  "api-gateway": Shield as ComponentType<LucideIconProps | SiIconProps>,
-  "payment-service": CreditCard as ComponentType<LucideIconProps | SiIconProps>,
-  "user-service": User as ComponentType<LucideIconProps | SiIconProps>,
-  "order-service": Package as ComponentType<LucideIconProps | SiIconProps>,
-  "redis-cache": SiRedis as ComponentType<LucideIconProps | SiIconProps>,
-};
-
-const INFRA_ICONS: Record<
-  string,
-  ComponentType<LucideIconProps | SiIconProps>
-> = {
-  prometheus: SiPrometheus as ComponentType<LucideIconProps | SiIconProps>,
-  neo4j: SiNeo4J as ComponentType<LucideIconProps | SiIconProps>,
+const MICROSERVICE_ICONS: Record<string, IconComponent> = {
+  "api-gateway": Shield as IconComponent,
+  "payment-service": CreditCard as IconComponent,
+  "user-service": User as IconComponent,
+  "order-service": Package as IconComponent,
+  "redis-cache": SiRedis as IconComponent,
 };
 
 const MICROSERVICES = [
@@ -57,65 +54,44 @@ const MICROSERVICES = [
   "redis-cache",
 ];
 
-const INFRA_SERVICES = ["prometheus", "neo4j"];
-
-// ─── Status helpers ────────────────────────────────────────────────────────────
-
 type ServiceStatus = "healthy" | "unhealthy" | "unreachable";
 
-function statusColor(status: ServiceStatus) {
-  if (status === "healthy") return "text-emerald-500";
-  if (status === "unhealthy") return "text-amber-500";
-  return "text-destructive";
+function toVariant(status: ServiceStatus | undefined): StatusVariant {
+  if (status === "healthy") return "healthy";
+  if (status === "unhealthy") return "degraded";
+  if (status === "unreachable") return "critical";
+  return "unknown";
 }
 
-function statusDotClass(status: ServiceStatus) {
+function systemIcon(status: "healthy" | "degraded" | undefined) {
+  const cls = "h-3.5 w-3.5";
   if (status === "healthy")
-    return "bg-emerald-500 shadow-[0_0_5px_rgba(34,197,94,0.6)]";
-  if (status === "unhealthy")
-    return "bg-amber-500 shadow-[0_0_5px_rgba(245,158,11,0.6)]";
-  return "bg-destructive shadow-[0_0_5px_rgba(239,68,68,0.5)]";
-}
-
-function overallStatusIcon(status: "healthy" | "degraded" | undefined) {
-  if (status === "healthy")
-    return <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />;
+    return <CheckCircle2 className={`${cls} text-status-healthy`} />;
   if (status === "degraded")
-    return <AlertTriangle className="h-3.5 w-3.5 text-amber-500" />;
-  return <XCircle className="h-3.5 w-3.5 text-muted-foreground" />;
+    return <AlertTriangle className={`${cls} text-status-degraded`} />;
+  return <XCircle className={`${cls} text-muted-foreground`} />;
 }
-
-// ─── Sub-components ────────────────────────────────────────────────────────────
 
 function StatCard({
   label,
   value,
   sub,
-  accent,
+  tone = "default",
 }: {
   label: string;
   value: React.ReactNode;
   sub?: string;
-  accent?: "emerald" | "amber" | "muted";
+  tone?: "default" | "brand" | "healthy" | "degraded" | "critical";
 }) {
-  const valueClass =
-    accent === "emerald"
-      ? "text-emerald-500"
-      : accent === "amber"
-        ? "text-amber-500"
-        : "text-foreground";
-
   return (
-    <Card className="p-0">
+    <Card tone={tone} className="p-0">
       <CardContent className="p-3">
-        <p className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+        <p className="text-[10px] font-medium uppercase tracking-[0.14em] text-muted-foreground/80">
           {label}
         </p>
-        <p
-          className={`mt-1.5 font-mono text-2xl font-semibold tabular-nums leading-none ${valueClass}`}
-        >
+        <div className="mt-1.5 font-mono text-2xl font-semibold tabular-nums leading-none tracking-tight">
           {value}
-        </p>
+        </div>
         {sub && (
           <p className="mt-1 font-mono text-[10px] text-muted-foreground">
             {sub}
@@ -129,66 +105,98 @@ function StatCard({
 function ServiceCard({
   name,
   status,
+  serviceId,
+  onSelect,
 }: {
   name: string;
   status: ServiceStatus;
+  serviceId: string;
+  onSelect: () => void;
 }) {
-  const Icon =
-    MICROSERVICE_ICONS[name] ??
-    (Server as ComponentType<LucideIconProps | SiIconProps>);
+  const Icon = MICROSERVICE_ICONS[name] ?? (Server as IconComponent);
+  const variant = toVariant(status);
 
   return (
-    <Card className="p-0">
-      <CardContent className="p-3">
-        <div className="flex items-start justify-between gap-2">
-          <div className="flex items-center gap-2 min-w-0">
-            <Icon
-              className="h-3.5 w-3.5 shrink-0 text-muted-foreground"
-              size={14}
-            />
-            <span className="font-mono text-xs truncate">{name}</span>
+    <Card
+      tone={status === "unreachable" ? "critical" : status === "unhealthy" ? "degraded" : "default"}
+      className="p-0 transition-colors focus-within:ring-2 focus-within:ring-ring hover:bg-muted/30"
+      style={{ viewTransitionName: `node-${serviceId}` }}
+    >
+      <button
+        type="button"
+        onClick={onSelect}
+        aria-label={`View details for ${name}`}
+        className="block w-full cursor-pointer text-left outline-none"
+      >
+        <CardContent className="p-3">
+          <div className="flex items-start justify-between gap-2">
+            <div className="flex min-w-0 items-center gap-2">
+              <Icon
+                className="h-3.5 w-3.5 shrink-0 text-muted-foreground"
+                size={14}
+              />
+              <span className="truncate font-mono text-xs">{name}</span>
+            </div>
+            <StatusDot variant={variant} size="sm" />
           </div>
-          <span
-            className={`mt-0.5 h-1.5 w-1.5 shrink-0 rounded-full ${statusDotClass(status)}`}
-          />
-        </div>
-        <p
-          className={`mt-2 font-mono text-[10px] uppercase tracking-wider ${statusColor(status)}`}
-        >
-          {status}
-        </p>
-      </CardContent>
+          <p
+            className={`mt-2 font-mono text-[10px] uppercase tracking-[0.14em] ${
+              variant === "healthy"
+                ? "text-status-healthy"
+                : variant === "degraded"
+                  ? "text-status-degraded"
+                  : "text-status-critical"
+            }`}
+          >
+            {status}
+          </p>
+        </CardContent>
+      </button>
     </Card>
   );
 }
 
-function InfraRow({
-  name,
-  status,
+function ExternalServiceCard({
+  service,
+  healthVariant,
+  onSelect,
 }: {
-  name: string;
-  status: ServiceStatus | undefined;
+  service: (typeof EXTERNAL_SERVICES)[number];
+  healthVariant: StatusVariant | null;
+  onSelect: () => void;
 }) {
-  const Icon =
-    INFRA_ICONS[name] ??
-    (Activity as ComponentType<LucideIconProps | SiIconProps>);
-  const resolvedStatus: ServiceStatus = status ?? "unreachable";
-
+  const Icon = service.icon;
   return (
-    <div className="flex items-center gap-3 rounded-[var(--radius)] bg-muted/40 px-3 py-2">
-      <Icon
-        className="h-3.5 w-3.5 shrink-0 text-muted-foreground"
-        size={14}
-      />
-      <span className="font-mono text-xs flex-1">{name}</span>
-      <span
-        className={`h-1.5 w-1.5 shrink-0 rounded-full ${statusDotClass(resolvedStatus)}`}
-      />
-      <span
-        className={`font-mono text-[10px] uppercase tracking-wider ${statusColor(resolvedStatus)}`}
+    <div className="group relative flex items-center justify-between gap-3 border border-border/60 bg-muted/30 transition-colors focus-within:border-border hover:border-border hover:bg-muted/50">
+      <button
+        type="button"
+        onClick={onSelect}
+        aria-label={`View details for ${service.label}`}
+        className="flex min-w-0 flex-1 cursor-pointer items-center gap-2.5 px-3 py-2.5 text-left outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
       >
-        {resolvedStatus}
-      </span>
+        <Icon className="h-4 w-4 shrink-0 text-muted-foreground" />
+        <div className="min-w-0">
+          <p className="truncate font-mono text-xs text-foreground">
+            {service.label}
+          </p>
+          <p className="truncate text-[10px] text-muted-foreground">
+            {service.description}
+          </p>
+        </div>
+      </button>
+      <div className="flex items-center gap-2 pr-3">
+        {healthVariant && <StatusDot variant={healthVariant} size="sm" />}
+        <a
+          href={service.url}
+          target="_blank"
+          rel="noopener noreferrer"
+          onClick={(e) => e.stopPropagation()}
+          aria-label={`Open ${service.label} in new tab`}
+          className="inline-flex h-6 w-6 items-center justify-center text-muted-foreground/60 outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+        >
+          <ExternalLink className="h-3 w-3 shrink-0" />
+        </a>
+      </div>
     </div>
   );
 }
@@ -196,7 +204,7 @@ function InfraRow({
 function StatCardSkeleton() {
   return (
     <Card className="p-0">
-      <CardContent className="p-3 space-y-2">
+      <CardContent className="space-y-2 p-3">
         <Skeleton className="h-2.5 w-20" />
         <Skeleton className="h-7 w-12" />
         <Skeleton className="h-2 w-16" />
@@ -208,8 +216,8 @@ function StatCardSkeleton() {
 function ServiceCardSkeleton() {
   return (
     <Card className="p-0">
-      <CardContent className="p-3 space-y-2">
-        <div className="flex justify-between items-center">
+      <CardContent className="space-y-2 p-3">
+        <div className="flex items-center justify-between">
           <Skeleton className="h-3 w-24" />
           <Skeleton className="h-1.5 w-1.5 rounded-full" />
         </div>
@@ -219,14 +227,20 @@ function ServiceCardSkeleton() {
   );
 }
 
-// ─── Page ─────────────────────────────────────────────────────────────────────
-
 export default function HomePage() {
   const { data, isLoading, error } = useQuery(healthQueryOptions);
   const { data: providersData, isLoading: isLoadingProviders } = useQuery(
     providerQueries.list(),
   );
   const [sqliteKeyIds, setSqliteKeyIds] = useState<Set<string>>(new Set());
+  const [sheetOpen, setSheetOpen] = useState(false);
+  const [selectedService, setSelectedService] =
+    useState<ServiceDetailSheetService | null>(null);
+
+  const openServiceSheet = (service: ServiceDetailSheetService) => {
+    setSelectedService(service);
+    setSheetOpen(true);
+  };
 
   useEffect(() => {
     getKeyStatus().then((result) => {
@@ -250,9 +264,6 @@ export default function HomePage() {
   const microservices = data
     ? MICROSERVICES.filter((s) => s in data.services)
     : [];
-  const infraServices = data
-    ? INFRA_SERVICES.filter((s) => s in data.services)
-    : [];
 
   const configuredProviders = providersData
     ? providersData.providers.filter(
@@ -261,29 +272,20 @@ export default function HomePage() {
     : null;
 
   const systemStatus = data?.status;
-  const statusAccent =
+  const systemTone: "default" | "healthy" | "degraded" | "critical" =
     systemStatus === "healthy"
-      ? "emerald"
+      ? "healthy"
       : systemStatus === "degraded"
-        ? "amber"
-        : "muted";
+        ? "degraded"
+        : "default";
 
   return (
-    <motion.div
-      className="mx-auto max-w-6xl space-y-5"
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      transition={{ duration: 0.25 }}
-    >
-      {/* ── Page header ──────────────────────────────────────────────────── */}
-      <div>
-        <h1 className="text-base font-semibold">System Overview</h1>
-        <p className="text-xs text-muted-foreground">
-          Real-time infrastructure health across all monitored services
-        </p>
-      </div>
+    <PageMount className="mx-auto max-w-6xl space-y-5">
+      <PageHeader
+        title="System Overview"
+        description="Real-time infrastructure health across all monitored services"
+      />
 
-      {/* ── Stat row ──────────────────────────────────────────────────────── */}
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         {isLoading ? (
           Array.from({ length: 4 }).map((_, i) => (
@@ -295,31 +297,37 @@ export default function HomePage() {
               label="Services Online"
               value={
                 data ? (
-                  <>
-                    <span className="text-emerald-500">{healthyCount}</span>
-                    <span className="text-muted-foreground text-lg">
+                  <span className="flex items-baseline gap-1">
+                    <span className="text-status-healthy">
+                      <AnimatedNumber value={healthyCount} />
+                    </span>
+                    <span className="text-lg text-muted-foreground">
                       /{totalCount}
                     </span>
-                  </>
+                  </span>
                 ) : (
                   "—"
                 )
               }
-              sub={data ? `${totalCount - healthyCount} degraded or down` : undefined}
-              accent="muted"
+              sub={
+                data
+                  ? `${totalCount - healthyCount} degraded or down`
+                  : undefined
+              }
+              tone={systemTone}
             />
 
             <StatCard
               label="System Status"
               value={
                 <span className="flex items-center gap-1.5">
-                  {overallStatusIcon(systemStatus)}
+                  {systemIcon(systemStatus)}
                   <span
                     className={
-                      statusAccent === "emerald"
-                        ? "text-emerald-500"
-                        : statusAccent === "amber"
-                          ? "text-amber-500"
+                      systemStatus === "healthy"
+                        ? "text-status-healthy"
+                        : systemStatus === "degraded"
+                          ? "text-status-degraded"
                           : "text-muted-foreground"
                     }
                   >
@@ -334,11 +342,20 @@ export default function HomePage() {
                     ? "partial outage detected"
                     : undefined
               }
+              tone={systemTone}
             />
 
             <StatCard
               label="Configured Providers"
-              value={isLoadingProviders ? "…" : (configuredProviders ?? "—")}
+              value={
+                isLoadingProviders ? (
+                  "…"
+                ) : configuredProviders !== null ? (
+                  <AnimatedNumber value={configuredProviders} />
+                ) : (
+                  "—"
+                )
+              }
               sub={
                 providersData
                   ? `${providersData.providers.length - (configuredProviders ?? 0)} need setup`
@@ -355,16 +372,14 @@ export default function HomePage() {
         )}
       </div>
 
-      {/* ── Error banner ─────────────────────────────────────────────────── */}
       {error && (
-        <div className="rounded-[var(--radius)] bg-destructive/10 px-3 py-2 font-mono text-xs text-destructive">
+        <div className="bg-status-critical-soft px-3 py-2 font-mono text-xs text-status-critical">
           Failed to fetch health data: {error.message}
         </div>
       )}
 
-      {/* ── Service health grid ───────────────────────────────────────────── */}
       <div>
-        <p className="mb-2 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+        <p className="mb-2 text-[10px] font-medium uppercase tracking-[0.14em] text-muted-foreground/80">
           Microservices
         </p>
         {isLoading ? (
@@ -375,100 +390,102 @@ export default function HomePage() {
           </div>
         ) : data ? (
           <div className="grid grid-cols-2 gap-2 md:grid-cols-3 lg:grid-cols-4">
-            {microservices.map((name) => (
-              <ServiceCard
-                key={name}
-                name={name}
-                status={data.services[name]}
-              />
-            ))}
+            {microservices.map((name) => {
+              const status = data.services[name];
+              const variant = toVariant(status);
+              return (
+                <ServiceCard
+                  key={name}
+                  name={name}
+                  serviceId={name}
+                  status={status}
+                  onSelect={() =>
+                    openServiceSheet({
+                      id: name,
+                      name,
+                      type: "Microservice",
+                      healthVariant: variant,
+                      healthLabel: status,
+                    })
+                  }
+                />
+              );
+            })}
           </div>
         ) : null}
       </div>
 
-      {/* ── Infrastructure section ────────────────────────────────────────── */}
       <div>
-        <p className="mb-2 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
-          Infrastructure
+        <p className="mb-2 text-[10px] font-medium uppercase tracking-[0.14em] text-muted-foreground/80">
+          Infrastructure Tools
         </p>
-        {isLoading ? (
-          <div className="space-y-1.5">
-            {Array.from({ length: 2 }).map((_, i) => (
-              <div key={i} className="rounded-[var(--radius)] bg-muted/40 px-3 py-2">
-                <Skeleton className="h-3 w-40" />
-              </div>
-            ))}
-          </div>
-        ) : data ? (
-          <div className="space-y-1.5">
-            {infraServices.map((name) => (
-              <InfraRow key={name} name={name} status={data.services[name]} />
-            ))}
-            {infraServices.length === 0 && (
-              <p className="font-mono text-xs text-muted-foreground">
-                No infrastructure services detected.
-              </p>
-            )}
-          </div>
-        ) : null}
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+          {EXTERNAL_SERVICES.map((svc) => {
+            const status = data?.services[svc.id];
+            const healthVariant = status ? toVariant(status) : null;
+            return (
+              <ExternalServiceCard
+                key={svc.id}
+                service={svc}
+                healthVariant={healthVariant}
+                onSelect={() =>
+                  openServiceSheet({
+                    id: svc.id,
+                    name: svc.label,
+                    type: svc.label,
+                    healthVariant: healthVariant ?? "unknown",
+                    healthLabel: status ?? "unknown",
+                  })
+                }
+              />
+            );
+          })}
+        </div>
       </div>
 
-      {/* ── Provider chips ────────────────────────────────────────────────── */}
       {providersData && providersData.providers.length > 0 && (
         <div>
-          <p className="mb-2 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+          <p className="mb-2 text-[10px] font-medium uppercase tracking-[0.14em] text-muted-foreground/80">
             LLM Providers
           </p>
           <div className="flex flex-wrap gap-2">
-            {providersData.providers.map((provider) => (
-              <div
-                key={provider.id}
-                className="flex items-center gap-2 rounded-[var(--radius)] bg-muted/40 px-3 py-1.5"
-              >
-                {(() => {
-                  const configured =
-                    !provider.requires_key || sqliteKeyIds.has(provider.id);
-                  const healthy = provider.available;
+            {providersData.providers.map((provider) => {
+              const configured =
+                !provider.requires_key || sqliteKeyIds.has(provider.id);
+              const healthy = provider.available;
+              const variant: StatusVariant = configured && healthy
+                ? "healthy"
+                : configured
+                  ? "degraded"
+                  : "unknown";
 
-                  return (
-                    <>
-                      <span
-                        className={`h-1.5 w-1.5 rounded-full ${
-                          configured && healthy
-                            ? "bg-emerald-500 shadow-[0_0_5px_rgba(34,197,94,0.6)]"
-                            : configured
-                              ? "bg-blue-500 shadow-[0_0_5px_rgba(59,130,246,0.45)]"
-                              : "bg-muted-foreground"
-                        }`}
-                      />
-                      <span className="font-mono text-xs">{provider.name}</span>
-                      {!provider.requires_key ? (
-                        <span className="text-[9px] uppercase tracking-wider text-blue-400">
-                          local
-                        </span>
-                      ) : configured ? (
-                        <span className="text-[9px] uppercase tracking-wider text-blue-400">
-                          configured
-                        </span>
-                      ) : (
-                        <span className="text-[9px] uppercase tracking-wider text-amber-500">
-                          no key
-                        </span>
-                      )}
-                    </>
-                  );
-                })()}
-              </div>
-            ))}
+              return (
+                <StatusPill key={provider.id} variant={variant}>
+                  <span className="font-mono normal-case tracking-normal text-current">
+                    {provider.name}
+                  </span>
+                  {!provider.requires_key
+                    ? " · local"
+                    : configured
+                      ? " · ready"
+                      : " · no key"}
+                </StatusPill>
+              );
+            })}
           </div>
         </div>
       )}
 
-      {/* ── Refresh note ──────────────────────────────────────────────────── */}
       <p className="font-mono text-[10px] text-muted-foreground/50">
         Auto-refreshes every 30s &middot; Last updated:{" "}
         <span suppressHydrationWarning>{new Date().toLocaleTimeString()}</span>
       </p>
-    </motion.div>
+
+      <ServiceDetailSheet
+        open={sheetOpen}
+        onOpenChange={setSheetOpen}
+        service={selectedService}
+      />
+    </PageMount>
   );
 }

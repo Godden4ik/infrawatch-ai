@@ -1,14 +1,27 @@
 "use client";
 
-import { useId } from "react";
+import { useId, useMemo, useState } from "react";
+import { useTheme } from "next-themes";
 import type { MetricPoint } from "@/services/metrics/schema";
 
 interface MetricChartProps {
   title: string;
   data: MetricPoint[];
-  color: string;
-  areaColor: string;
+  /** CSS variable name for line/dot color, e.g. "--status-healthy". */
+  colorVar: string;
+  /** CSS variable name for area/gradient base, e.g. "--status-healthy-soft". */
+  areaVar: string;
   formatValue: (value: number) => string;
+}
+
+// Duplicated locally — kept in sync with live-chart.tsx but intentionally not
+// imported (live-chart.tsx has a fragile fix we don't want to couple to).
+function cssVar(name: string): string {
+  if (typeof window === "undefined") return "#888";
+  const raw = getComputedStyle(document.documentElement)
+    .getPropertyValue(name)
+    .trim();
+  return raw || "#888";
 }
 
 const CHART_WIDTH = 280;
@@ -59,19 +72,65 @@ function buildSparkline(data: MetricPoint[]) {
   const firstPoint = points[0];
   const areaPath = `${linePath} L ${lastPoint.x.toFixed(2)} ${(CHART_HEIGHT - PAD_Y).toFixed(2)} L ${firstPoint.x.toFixed(2)} ${(CHART_HEIGHT - PAD_Y).toFixed(2)} Z`;
 
-  return { linePath, areaPath, lastPoint };
+  return { linePath, areaPath, lastPoint, points };
+}
+
+function formatHoverTime(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  const hh = String(d.getHours()).padStart(2, "0");
+  const mm = String(d.getMinutes()).padStart(2, "0");
+  const ss = String(d.getSeconds()).padStart(2, "0");
+  return `${hh}:${mm}:${ss}`;
 }
 
 export function MetricChart({
   title,
   data,
-  color,
-  areaColor,
+  colorVar,
+  areaVar,
   formatValue,
 }: MetricChartProps) {
+  const { resolvedTheme } = useTheme();
+  const isDark = resolvedTheme === "dark";
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- isDark forces re-resolve when theme flips
+  const color = useMemo(() => cssVar(colorVar), [colorVar, isDark]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- isDark forces re-resolve when theme flips
+  const areaColor = useMemo(() => cssVar(areaVar), [areaVar, isDark]);
+
   const gradientId = useId().replace(/:/g, "");
   const safeData = sanitizeMetricData(data);
   const sparkline = buildSparkline(safeData);
+  const [hoverIndex, setHoverIndex] = useState<number | null>(null);
+
+  const handlePointer = (clientX: number, target: SVGElement) => {
+    const svg = target.ownerSVGElement ?? (target as unknown as SVGSVGElement);
+    if (!svg || !sparkline) return;
+    const ctm = svg.getScreenCTM();
+    if (!ctm) return;
+    const pt = svg.createSVGPoint();
+    pt.x = clientX;
+    pt.y = 0;
+    const local = pt.matrixTransform(ctm.inverse());
+    let best = 0;
+    let bestDist = Infinity;
+    sparkline.points.forEach((p, i) => {
+      const dist = Math.abs(p.x - local.x);
+      if (dist < bestDist) {
+        bestDist = dist;
+        best = i;
+      }
+    });
+    setHoverIndex(best);
+  };
+
+  const activePoint =
+    hoverIndex !== null && sparkline ? sparkline.points[hoverIndex] : null;
+  const activeDatum =
+    hoverIndex !== null ? safeData[hoverIndex] ?? null : null;
+  const tooltipLeftPct = activePoint
+    ? (activePoint.x / CHART_WIDTH) * 100
+    : null;
   const latestValue =
     safeData.length > 0 ? safeData[safeData.length - 1].value : null;
   const minValue =
@@ -106,13 +165,14 @@ export function MetricChart({
         />
       </div>
 
-      <div className="mt-2 h-[76px]">
+      <div className="relative mt-2 h-[76px]">
         {sparkline ? (
           <svg
             viewBox={`0 0 ${CHART_WIDTH} ${CHART_HEIGHT}`}
             className="h-full w-full"
             aria-label={`${title} trend`}
             role="img"
+            preserveAspectRatio="none"
           >
             <defs>
               <linearGradient id={gradientId} x1="0" x2="0" y1="0" y2="1">
@@ -146,11 +206,55 @@ export function MetricChart({
               strokeWidth="2"
               vectorEffect="non-scaling-stroke"
             />
-            <circle
-              cx={sparkline.lastPoint.x}
-              cy={sparkline.lastPoint.y}
-              r="3"
-              fill={color}
+            {activePoint ? (
+              <>
+                <line
+                  x1={activePoint.x}
+                  x2={activePoint.x}
+                  y1={0}
+                  y2={CHART_HEIGHT}
+                  stroke={color}
+                  strokeOpacity="0.32"
+                  strokeWidth="1"
+                  vectorEffect="non-scaling-stroke"
+                />
+                <circle
+                  cx={activePoint.x}
+                  cy={activePoint.y}
+                  r="3.5"
+                  fill={color}
+                  stroke="var(--background)"
+                  strokeWidth="1.5"
+                  vectorEffect="non-scaling-stroke"
+                />
+              </>
+            ) : (
+              <circle
+                cx={sparkline.lastPoint.x}
+                cy={sparkline.lastPoint.y}
+                r="3"
+                fill={color}
+              />
+            )}
+            <rect
+              x={0}
+              y={0}
+              width={CHART_WIDTH}
+              height={CHART_HEIGHT}
+              fill="transparent"
+              onMouseMove={(e) =>
+                handlePointer(e.clientX, e.currentTarget as SVGElement)
+              }
+              onMouseLeave={() => setHoverIndex(null)}
+              onTouchMove={(e) => {
+                const touch = e.touches[0];
+                if (touch)
+                  handlePointer(
+                    touch.clientX,
+                    e.currentTarget as SVGElement,
+                  );
+              }}
+              onTouchEnd={() => setHoverIndex(null)}
             />
           </svg>
         ) : (
@@ -160,6 +264,22 @@ export function MetricChart({
             </span>
           </div>
         )}
+        {activeDatum && tooltipLeftPct !== null ? (
+          <div
+            className="pointer-events-none absolute -top-2 z-10 -translate-x-1/2 -translate-y-full border border-border bg-popover px-2.5 py-1.5 font-mono text-[11px] text-popover-foreground shadow-md"
+            style={{ left: `${tooltipLeftPct}%` }}
+          >
+            <div className="text-[9px] tracking-[0.16em] text-muted-foreground/80 uppercase">
+              {formatHoverTime(activeDatum.time)}
+            </div>
+            <div
+              className="mt-0.5 text-sm font-semibold tabular-nums"
+              style={{ color }}
+            >
+              {formatValue(activeDatum.value)}
+            </div>
+          </div>
+        ) : null}
       </div>
 
       {minValue !== null && maxValue !== null ? (

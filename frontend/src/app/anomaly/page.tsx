@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { motion } from "motion/react";
 import { AlertTriangle, History, ShieldAlert, Target } from "lucide-react";
 import { healthQueryOptions } from "@/services/health/query-options";
 import { SERVICES } from "@/services/anomaly/schema";
@@ -23,6 +22,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { PageHeader, PageMetaCell } from "@/components/layout/page-header";
+import { PageMount } from "@/components/layout/page-mount";
 import { cn } from "@/lib/utils";
 import { ScenarioButtons } from "./_components/scenario-buttons";
 import { InjectForm } from "./_components/inject-form";
@@ -34,8 +35,8 @@ function buildEventId(prefix: string) {
 }
 
 function statusDot(status: "healthy" | "unhealthy" | "unreachable" | undefined) {
-  if (status === "healthy") return "bg-emerald-500";
-  if (status === "unhealthy") return "bg-amber-500";
+  if (status === "healthy") return "bg-status-healthy";
+  if (status === "unhealthy") return "bg-status-degraded";
   return "bg-muted-foreground";
 }
 
@@ -353,41 +354,20 @@ export default function AnomalyPage() {
   }
 
   return (
-    <motion.div
-      className="mx-auto max-w-6xl space-y-4"
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      transition={{ duration: 0.25 }}
-    >
-      <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
-        <div>
-          <h1 className="text-base font-semibold">Anomaly Injection</h1>
-          <p className="text-xs text-muted-foreground">
-            Dense control surface for single-service faults and dependency cascades.
-          </p>
-        </div>
+    <PageMount className="mx-auto max-w-6xl space-y-4">
+      <PageHeader
+        title="Anomaly Injection"
+        description="Dense control surface for single-service faults and dependency cascades."
+        meta={
+          <>
+            <PageMetaCell label="Tracked faults" value={activeInjections.length} />
+            <PageMetaCell label="Scenarios" value="1" />
+            <PageMetaCell label="Journal" value={events.length} />
+          </>
+        }
+      />
 
-        <div className="grid grid-cols-2 gap-2 font-mono text-[11px] text-muted-foreground lg:grid-cols-3">
-          <div className="bg-card/50 px-3 py-2 ring-1 ring-inset ring-border/70">
-            <div className="tracking-[0.16em] uppercase">Tracked faults</div>
-            <div className="mt-1 text-sm font-semibold text-foreground">
-              {activeInjections.length}
-            </div>
-          </div>
-          <div className="bg-card/50 px-3 py-2 ring-1 ring-inset ring-border/70">
-            <div className="tracking-[0.16em] uppercase">Scenarios</div>
-            <div className="mt-1 text-sm font-semibold text-foreground">1</div>
-          </div>
-          <div className="bg-card/50 px-3 py-2 ring-1 ring-inset ring-border/70">
-            <div className="tracking-[0.16em] uppercase">Journal</div>
-            <div className="mt-1 text-sm font-semibold text-foreground">{events.length}</div>
-          </div>
-        </div>
-      </div>
-
-      <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}>
-        <LiveStatusPanel />
-      </motion.div>
+      <LiveStatusPanel />
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <StatCard
@@ -414,54 +394,32 @@ export default function AnomalyPage() {
 
       <div className="grid gap-3 xl:grid-cols-[minmax(0,1.35fr)_minmax(320px,0.85fr)]">
         <div className="space-y-3">
-          <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}>
-            <InjectForm
-              activeInjections={activeInjections}
-              serviceStatuses={services}
-              onInjected={handleInjected}
-            />
-          </motion.div>
+          <InjectForm
+            activeInjections={activeInjections}
+            serviceStatuses={services}
+            onInjected={handleInjected}
+          />
 
-          <motion.div
-            initial={{ opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.05 }}
-          >
-            <HistoryCard events={events} />
-          </motion.div>
+          <HistoryCard events={events} />
         </div>
 
         <div className="space-y-3">
-          <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}>
-            <ScenarioButtons
-              onReset={handleReset}
-              onScenarioInjected={handleScenarioInjected}
-            />
-          </motion.div>
+          <ScenarioButtons
+            onReset={handleReset}
+            onScenarioInjected={handleScenarioInjected}
+          />
 
-          <motion.div
-            initial={{ opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.05 }}
-          >
-            <ActiveAnomaliesCard activeInjections={activeInjections} />
-          </motion.div>
+          <ActiveAnomaliesCard activeInjections={activeInjections} />
 
-          <motion.div
-            initial={{ opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.1 }}
-          >
-            <ServiceTargetsCard
-              activeInjections={activeInjections}
-              serviceStatuses={services}
-            />
-          </motion.div>
+          <ServiceTargetsCard
+            activeInjections={activeInjections}
+            serviceStatuses={services}
+          />
         </div>
       </div>
 
       {data?.status === "degraded" ? (
-        <div className="flex items-center gap-2 bg-amber-500/10 px-3 py-2 font-mono text-[11px] text-amber-500 ring-1 ring-inset ring-amber-500/20">
+        <div className="flex items-center gap-2 bg-status-degraded-soft px-3 py-2 font-mono text-[11px] text-status-degraded ring-1 ring-inset ring-status-degraded/20">
           <AlertTriangle className="h-3.5 w-3.5" />
           System already degraded. New injections stack on top of live instability.
         </div>
@@ -478,6 +436,6 @@ export default function AnomalyPage() {
           Ready for controlled failure injection
         </div>
       )}
-    </motion.div>
+    </PageMount>
   );
 }

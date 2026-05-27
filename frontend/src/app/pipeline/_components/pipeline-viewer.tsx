@@ -42,9 +42,9 @@ function getConsoleStats(state: PipelineState | undefined) {
 }
 
 function statusTone(status: PipelineState["status"] | undefined) {
-  if (status === "running") return "text-primary";
-  if (status === "complete") return "text-success";
-  if (status === "error") return "text-destructive";
+  if (status === "running") return "text-brand";
+  if (status === "complete") return "text-status-healthy";
+  if (status === "error") return "text-status-critical";
   return "text-muted-foreground";
 }
 
@@ -132,9 +132,9 @@ export function PipelineViewer({ state }: PipelineViewerProps) {
             variant="outline"
             className={cn(
               "font-mono text-[10px] uppercase",
-              state.status === "running" && "border-primary/20 bg-primary/10 text-primary",
-              state.status === "complete" && "text-success",
-              state.status === "error" && "border-destructive/20 bg-destructive/10 text-destructive",
+              state.status === "running" && "border-brand/30 bg-brand-soft text-brand",
+              state.status === "complete" && "border-status-healthy/20 bg-status-healthy-soft text-status-healthy",
+              state.status === "error" && "border-status-critical/20 bg-status-critical-soft text-status-critical",
             )}
           >
             {state.status}
@@ -169,7 +169,7 @@ export function PipelineViewer({ state }: PipelineViewerProps) {
         </div>
 
         {state.error ? (
-          <div className="bg-destructive/10 px-3 py-2 text-xs text-destructive ring-1 ring-inset ring-destructive/20">
+          <div className="border border-status-critical/20 bg-status-critical-soft px-3 py-2 font-mono text-[12px] leading-relaxed text-status-critical">
             {state.error}
           </div>
         ) : null}
@@ -178,7 +178,7 @@ export function PipelineViewer({ state }: PipelineViewerProps) {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ duration: 0.25 }}
-          className="min-h-[520px] space-y-1 bg-muted/10 px-3 py-3 ring-1 ring-inset ring-border/60"
+          className="min-h-[520px] space-y-1 border border-border/60 bg-background/60 px-3 py-3 font-mono text-[12px] leading-relaxed text-foreground/90"
         >
           {AGENT_ORDER.map((agent, index) => (
             <AgentOutput
