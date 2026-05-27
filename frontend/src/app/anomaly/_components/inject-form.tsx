@@ -29,6 +29,7 @@ import {
   SelectTrigger,
 } from "@/components/ui/select";
 import { StatusDot, type StatusVariant } from "@/components/ui/status-indicator";
+import { SampleWaitIndicator } from "./sample-wait-indicator";
 import type { ActiveInjection, InjectResponse } from "./types";
 
 const ANOMALY_COPY: Record<
@@ -99,6 +100,7 @@ export function InjectForm({
 }: InjectFormProps) {
   const [service, setService] = useState<string>(SERVICES[0]);
   const [anomalyType, setAnomalyType] = useState<string>(ANOMALY_TYPES[0]);
+  const [waitStartedAt, setWaitStartedAt] = useState<number | null>(null);
   const queryClient = useQueryClient();
 
   const selectedAnomaly = ANOMALY_COPY[anomalyType];
@@ -125,6 +127,7 @@ export function InjectForm({
       toast.success(
         `Injection accepted for ${selectedServiceLabel}. Charts reflect change after the next Prometheus scrape (~5–15 s).`,
       );
+      setWaitStartedAt(Date.now());
       onInjected({
         id: buildEventId("inject"),
         kind: "inject",
@@ -289,6 +292,8 @@ export function InjectForm({
           )}
           Inject anomaly
         </Button>
+
+        <SampleWaitIndicator startedAt={waitStartedAt} />
       </CardContent>
     </Card>
   );
