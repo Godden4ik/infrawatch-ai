@@ -9,6 +9,8 @@ import { cn } from "@/lib/utils";
 import { Breadcrumbs } from "@/components/layout/breadcrumbs"
 import { CoreRouteTabs } from "@/components/layout/core-route-tabs"
 import { ExternalToolsStrip } from "@/components/layout/external-tools-strip"
+import { LogoutButton } from "@/components/layout/logout-button"
+import { env } from "@/env"
 
 const ibmPlexSans = IBM_Plex_Sans({ subsets: ['latin'], variable: '--font-sans', weight: ['300', '400', '500', '600', '700'] })
 
@@ -67,6 +69,7 @@ export default function RootLayout({
                         </span>
                       </div>
                       <ExternalToolsStrip />
+                      {env.DEMO_PASSWORD ? <LogoutButton /> : null}
                     </div>
                   </div>
                   <CoreRouteTabs />
