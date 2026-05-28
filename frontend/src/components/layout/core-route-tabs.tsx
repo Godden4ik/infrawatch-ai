@@ -57,7 +57,7 @@ export function CoreRouteTabs() {
   const activeTab = NAV_TABS.find((tab) => tab.href === activeHref);
 
   return (
-    <div className="border-t border-border/60 px-6 py-2">
+    <div className="border-t border-border/60 px-3 py-2 sm:px-6">
       <div className="hidden min-w-0 items-center gap-1 overflow-x-auto md:flex [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {NAV_TABS.map((tab) => {
           const active = tab.href === activeHref;
