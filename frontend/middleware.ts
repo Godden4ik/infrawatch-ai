@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { env } from "@/env";
+import { verifyAuthToken } from "@/lib/auth-token";
 
 export const config = {
   matcher: [
@@ -10,7 +11,7 @@ export const config = {
 
 const COOKIE_NAME = "demo_auth";
 
-export function middleware(req: NextRequest) {
+export async function middleware(req: NextRequest) {
   const demoPassword = env.DEMO_PASSWORD;
 
   // Auth disabled when no password is set (local dev convenience).
@@ -18,9 +19,14 @@ export function middleware(req: NextRequest) {
     return NextResponse.next();
   }
 
-  const cookieValue = req.cookies.get(COOKIE_NAME)?.value;
-  if (cookieValue && cookieValue === demoPassword) {
-    return NextResponse.next();
+  const secret = env.SESSION_SECRET;
+  // If the server is misconfigured (DEMO_PASSWORD without SESSION_SECRET),
+  // fail closed — redirect to /login. /api/login will surface the 503.
+  if (secret) {
+    const cookieValue = req.cookies.get(COOKIE_NAME)?.value;
+    if (await verifyAuthToken(cookieValue, secret)) {
+      return NextResponse.next();
+    }
   }
 
   const url = req.nextUrl.clone();

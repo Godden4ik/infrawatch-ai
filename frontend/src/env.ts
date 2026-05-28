@@ -11,6 +11,12 @@ export const env = createEnv({
      * Leave unset (or empty) to disable auth entirely (local dev default).
      */
     DEMO_PASSWORD: z.string().optional(),
+    /**
+     * HMAC key used to sign demo-auth session tokens. REQUIRED when
+     * DEMO_PASSWORD is set. Must be ≥32 chars of cryptographically random
+     * input. Generate with: openssl rand -hex 32
+     */
+    SESSION_SECRET: z.string().min(32).optional(),
   },
   client: {
     NEXT_PUBLIC_MSW_ENABLED: z
@@ -28,6 +34,7 @@ export const env = createEnv({
     API_BACKEND_URL: process.env.API_BACKEND_URL,
     PROMETHEUS_URL: process.env.PROMETHEUS_URL,
     DEMO_PASSWORD: process.env.DEMO_PASSWORD,
+    SESSION_SECRET: process.env.SESSION_SECRET,
     NEXT_PUBLIC_MSW_ENABLED: process.env.NEXT_PUBLIC_MSW_ENABLED,
     NEXT_PUBLIC_PROMETHEUS_URL: process.env.NEXT_PUBLIC_PROMETHEUS_URL,
     NEXT_PUBLIC_GRAFANA_URL: process.env.NEXT_PUBLIC_GRAFANA_URL,
