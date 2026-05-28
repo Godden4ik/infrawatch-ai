@@ -4,6 +4,7 @@ import "./globals.css"
 import { Providers } from "@/providers/providers"
 import { ToastProvider } from "@/components/ui/toast-provider"
 import { TooltipProvider } from "@/components/ui/tooltip"
+import { GridPattern } from "@/components/ui/grid-pattern"
 import { cn } from "@/lib/utils";
 import { Breadcrumbs } from "@/components/layout/breadcrumbs"
 import { CoreRouteTabs } from "@/components/layout/core-route-tabs"
@@ -33,6 +34,15 @@ export default function RootLayout({
       )}
     >
       <body className="h-full overflow-hidden bg-background text-foreground">
+        <div className="pointer-events-none fixed inset-0 -z-10 overflow-hidden">
+          <GridPattern
+            width={32}
+            height={32}
+            x={-1}
+            y={-1}
+            className="absolute inset-0 h-full w-full fill-transparent stroke-foreground/[0.04] [mask-image:radial-gradient(ellipse_120%_80%_at_50%_0%,black_30%,transparent_85%)]"
+          />
+        </div>
         <Providers>
           <TooltipProvider>
             <ToastProvider>
