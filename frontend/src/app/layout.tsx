@@ -6,12 +6,16 @@ import { ToastProvider } from "@/components/ui/toast-provider"
 import { TooltipProvider } from "@/components/ui/tooltip"
 import { AnimatedGridPattern } from "@/components/ui/animated-grid-pattern"
 import { cn } from "@/lib/utils";
-import { Breadcrumbs } from "@/components/layout/breadcrumbs"
-import { CoreRouteTabs } from "@/components/layout/core-route-tabs"
-import { ExternalToolsStrip } from "@/components/layout/external-tools-strip"
-import { LogoutButton } from "@/components/layout/logout-button"
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
+import { AuthAwareChrome } from "@/components/layout/auth-aware-chrome"
 import { env } from "@/env"
+
+export const viewport = {
+  // Prevents iOS Safari from zooming into form inputs (16px input rule
+  // is enforced separately via globals.css), while still allowing
+  // pinch-zoom for accessibility (maximumScale=1 would break that).
+  width: "device-width",
+  initialScale: 1,
+}
 
 const ibmPlexSans = IBM_Plex_Sans({ subsets: ['latin'], variable: '--font-sans', weight: ['300', '400', '500', '600', '700'] })
 
@@ -58,36 +62,7 @@ export default function RootLayout({
                   className="z-20 shrink-0 border-b border-border/60 bg-background/95 backdrop-blur-md"
                   style={{ viewTransitionName: "header-shell" }}
                 >
-                  <div className="flex h-10 items-center justify-between gap-2 px-3 sm:gap-4 sm:px-6">
-                    <Breadcrumbs />
-                    <div className="flex items-center gap-2 sm:gap-3">
-                      <Tooltip>
-                        <TooltipTrigger
-                          render={
-                            <div
-                              className="flex items-center gap-2 font-mono text-[11px] text-muted-foreground"
-                              style={{ viewTransitionName: "system-status" }}
-                              aria-label="System Online"
-                            >
-                              <span className="relative flex h-2 w-2 shrink-0">
-                                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-status-healthy opacity-60" />
-                                <span className="relative inline-flex h-2 w-2 rounded-full bg-status-healthy" />
-                              </span>
-                              <span className="hidden uppercase tracking-[0.14em] text-muted-foreground/80 sm:inline">
-                                System Online
-                              </span>
-                            </div>
-                          }
-                        />
-                        <TooltipContent>
-                          <span className="font-mono text-[11px]">System Online</span>
-                        </TooltipContent>
-                      </Tooltip>
-                      <ExternalToolsStrip />
-                      {env.DEMO_PASSWORD ? <LogoutButton /> : null}
-                    </div>
-                  </div>
-                  <CoreRouteTabs />
+                  <AuthAwareChrome authEnabled={!!env.DEMO_PASSWORD} />
                 </header>
                 <div className="min-h-0 flex-1 overflow-y-auto overscroll-auto px-3 py-4 sm:px-6 sm:py-5">
                   {children}

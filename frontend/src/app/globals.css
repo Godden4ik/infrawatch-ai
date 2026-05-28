@@ -232,3 +232,15 @@
     animation: none;
   }
 }
+
+/* iOS Safari zooms into any focused input/textarea/select with a
+   font-size < 16px. The monitoring UI uses small font sizes for
+   density, so enforce a 16px minimum on form fields at narrow
+   viewports only — desktop sizing stays unchanged. */
+@media (max-width: 640px) {
+  input,
+  textarea,
+  select {
+    font-size: 16px;
+  }
+}

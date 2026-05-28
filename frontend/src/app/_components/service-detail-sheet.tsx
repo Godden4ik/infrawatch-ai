@@ -89,7 +89,7 @@ export function ServiceDetailSheet({
         side="right"
         className="w-[400px] border-l border-border bg-background p-0 sm:max-w-[400px]"
       >
-        <SheetHeader className="border-b border-border/60 px-5 py-4">
+        <SheetHeader className="border-b border-border/60 px-5 py-4 pr-12">
           <div className="flex items-start justify-between gap-3">
             <div className="space-y-1">
               <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-muted-foreground/80">
