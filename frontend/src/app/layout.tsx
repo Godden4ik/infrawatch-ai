@@ -16,6 +16,74 @@ import { headers } from "next/headers"
 // rebuild. Calling headers() implicitly forces dynamic rendering.
 export const dynamic = "force-dynamic"
 
+const APP_NAME = "InfraWatch AI"
+const APP_DESCRIPTION =
+  "AI-powered infrastructure monitoring with MCP, multi-agent orchestration (LangGraph), and GraphRAG. Detect anomalies, trace root causes through a Neo4j dependency graph, and draft remediation plans in real time."
+
+export const metadata = {
+  applicationName: APP_NAME,
+  title: {
+    default: `${APP_NAME} · Infrastructure Monitoring`,
+    template: `%s · ${APP_NAME}`,
+  },
+  description: APP_DESCRIPTION,
+  keywords: [
+    "infrastructure monitoring",
+    "AI ops",
+    "AIOps",
+    "MCP",
+    "Model Context Protocol",
+    "LangGraph",
+    "GraphRAG",
+    "Neo4j",
+    "Prometheus",
+    "Grafana",
+    "anomaly detection",
+    "DevOps",
+    "incident response",
+    "agent pipeline",
+    "PJATK",
+    "capstone",
+  ],
+  authors: [{ name: "Tymur Mustafaiev" }],
+  creator: "Tymur Mustafaiev",
+  publisher: "PJATK",
+  formatDetection: { telephone: false, email: false, address: false },
+  // Private demo deployment — keep crawlers out.
+  robots: {
+    index: false,
+    follow: false,
+    nocache: true,
+    googleBot: {
+      index: false,
+      follow: false,
+      noimageindex: true,
+      "max-video-preview": -1,
+      "max-image-preview": "none" as const,
+      "max-snippet": -1,
+    },
+  },
+  openGraph: {
+    type: "website",
+    title: `${APP_NAME} · Infrastructure Monitoring`,
+    description: APP_DESCRIPTION,
+    siteName: APP_NAME,
+    locale: "en_US",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: `${APP_NAME} · Infrastructure Monitoring`,
+    description: APP_DESCRIPTION,
+  },
+  appleWebApp: {
+    capable: true,
+    title: APP_NAME,
+    statusBarStyle: "black-translucent" as const,
+  },
+  category: "technology",
+  manifest: "/manifest.webmanifest",
+}
+
 export const viewport = {
   // Prevents iOS Safari from zooming into form inputs (16 px input rule
   // is enforced separately via globals.css), while still allowing
