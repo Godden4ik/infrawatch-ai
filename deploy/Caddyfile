@@ -1,0 +1,57 @@
+# InfraWatch demo reverse proxy.
+#
+# Cloudflare Tunnel routes four hostnames to this container on port 80;
+# Caddy dispatches by Host header. The three infrastructure tools are
+# gated by an explicit reverse_proxy to /api/auth-check that traps the
+# 401 with handle_response and redirects to /login.
+
+{
+	auto_https off
+	admin off
+}
+
+(auth_gate) {
+	reverse_proxy frontend:3000 {
+		method GET
+		rewrite /api/auth-check
+
+		@denied status 401
+		handle_response @denied {
+			redir https://{$INFRAWATCH_HOST}/login 302
+		}
+	}
+}
+
+:80 {
+	# ── InfraWatch main UI ─────────────────────────────────────────────────
+	@infrawatch host {$INFRAWATCH_HOST}
+	handle @infrawatch {
+		reverse_proxy frontend:3000
+	}
+
+	# ── Grafana ────────────────────────────────────────────────────────────
+	@grafana host {$GRAFANA_HOST}
+	handle @grafana {
+		import auth_gate
+		reverse_proxy grafana:3000
+	}
+
+	# ── Prometheus ─────────────────────────────────────────────────────────
+	@prometheus host {$PROMETHEUS_HOST}
+	handle @prometheus {
+		import auth_gate
+		reverse_proxy prometheus:9090
+	}
+
+	# ── Neo4j Browser ──────────────────────────────────────────────────────
+	@neo4j host {$NEO4J_HOST}
+	handle @neo4j {
+		import auth_gate
+		reverse_proxy neo4j:7474
+	}
+
+	# Unknown hostnames → 404
+	handle {
+		respond 404
+	}
+}
