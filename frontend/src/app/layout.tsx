@@ -9,6 +9,12 @@ import { cn } from "@/lib/utils";
 import { AuthAwareChrome } from "@/components/layout/auth-aware-chrome"
 import { ExternalServicesProvider } from "@/lib/external-services-context"
 import { env } from "@/env"
+import { headers } from "next/headers"
+
+// Opt out of static layout caching: env.PUBLIC_*_URL is read per request so
+// changing the docker-compose env applies on container restart without a
+// rebuild. Calling headers() implicitly forces dynamic rendering.
+export const dynamic = "force-dynamic"
 
 export const viewport = {
   // Prevents iOS Safari from zooming into form inputs (16 px input rule
@@ -34,11 +40,14 @@ const fontMono = Geist_Mono({
   variable: "--font-mono",
 })
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode
 }>) {
+  // Touch headers() so Next.js treats this layout as dynamic (otherwise it
+  // gets statically rendered at build time and bakes in old env values).
+  await headers()
   return (
     <html
       lang="en"
