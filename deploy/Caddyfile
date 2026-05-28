@@ -29,8 +29,15 @@
 	}
 
 	# ── Prometheus (no auth — read-only PromQL exposed) ────────────────────
+	# Defense in depth: block admin / lifecycle paths even though the
+	# upstream is built without --web.enable-admin-api or
+	# --web.enable-lifecycle, so they return 403/500 anyway. Belt and
+	# suspenders against a future flag flip.
 	@prometheus host {$PROMETHEUS_HOST}
 	handle @prometheus {
+		@prom_admin path /-/reload /-/quit /api/v1/admin/* /api/v1/admin
+		respond @prom_admin 404
+
 		reverse_proxy prometheus:9090
 	}
 

@@ -439,6 +439,7 @@ export default function HomePage() {
                     type: svc.label,
                     healthVariant: healthVariant ?? "unknown",
                     healthLabel: status ?? "unknown",
+                    externalUrl: svc.url,
                   })
                 }
               />
