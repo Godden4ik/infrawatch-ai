@@ -4,8 +4,10 @@ import { verifyAuthToken } from "@/lib/auth-token";
 
 export const config = {
   matcher: [
-    // Run on everything except Next internals and static assets.
-    "/((?!_next/static|_next/image|favicon.ico|api/login|api/logout|login|.*\\.(?:png|jpg|jpeg|svg|ico|webp|woff2?)$).*)",
+    // Run on everything except Next internals, static assets, and the
+    // auth endpoints (login / logout / check) that must stay reachable
+    // for the gate to work — including Caddy's forward_auth probe.
+    "/((?!_next/static|_next/image|favicon.ico|api/login|api/logout|api/auth-check|login|.*\\.(?:png|jpg|jpeg|svg|ico|webp|woff2?)$).*)",
   ],
 };
 

@@ -4,13 +4,102 @@ import "./globals.css"
 import { Providers } from "@/providers/providers"
 import { ToastProvider } from "@/components/ui/toast-provider"
 import { TooltipProvider } from "@/components/ui/tooltip"
-import { GridPattern } from "@/components/ui/grid-pattern"
+import { AnimatedGridPattern } from "@/components/ui/animated-grid-pattern"
 import { cn } from "@/lib/utils";
-import { Breadcrumbs } from "@/components/layout/breadcrumbs"
-import { CoreRouteTabs } from "@/components/layout/core-route-tabs"
-import { ExternalToolsStrip } from "@/components/layout/external-tools-strip"
-import { LogoutButton } from "@/components/layout/logout-button"
+import { AuthAwareChrome } from "@/components/layout/auth-aware-chrome"
+import { ExternalServicesProvider } from "@/lib/external-services-context"
 import { env } from "@/env"
+import { headers } from "next/headers"
+
+// Opt out of static layout caching: env.PUBLIC_*_URL is read per request so
+// changing the docker-compose env applies on container restart without a
+// rebuild. Calling headers() implicitly forces dynamic rendering.
+export const dynamic = "force-dynamic"
+
+const APP_NAME = "InfraWatch AI"
+const APP_DESCRIPTION =
+  "AI-powered infrastructure monitoring with MCP, multi-agent orchestration (LangGraph), and GraphRAG. Detect anomalies, trace root causes through a Neo4j dependency graph, and draft remediation plans in real time."
+
+export const metadata = {
+  applicationName: APP_NAME,
+  title: {
+    default: `${APP_NAME} · Infrastructure Monitoring`,
+    template: `%s · ${APP_NAME}`,
+  },
+  description: APP_DESCRIPTION,
+  keywords: [
+    "infrastructure monitoring",
+    "AI ops",
+    "AIOps",
+    "MCP",
+    "Model Context Protocol",
+    "LangGraph",
+    "GraphRAG",
+    "Neo4j",
+    "Prometheus",
+    "Grafana",
+    "anomaly detection",
+    "DevOps",
+    "incident response",
+    "agent pipeline",
+    "PJATK",
+    "capstone",
+  ],
+  authors: [{ name: "Tymur Mustafaiev" }],
+  creator: "Tymur Mustafaiev",
+  publisher: "PJATK",
+  formatDetection: { telephone: false, email: false, address: false },
+  // Private demo deployment — keep crawlers out.
+  robots: {
+    index: false,
+    follow: false,
+    nocache: true,
+    googleBot: {
+      index: false,
+      follow: false,
+      noimageindex: true,
+      "max-video-preview": -1,
+      "max-image-preview": "none" as const,
+      "max-snippet": -1,
+    },
+  },
+  openGraph: {
+    type: "website",
+    title: `${APP_NAME} · Infrastructure Monitoring`,
+    description: APP_DESCRIPTION,
+    siteName: APP_NAME,
+    locale: "en_US",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: `${APP_NAME} · Infrastructure Monitoring`,
+    description: APP_DESCRIPTION,
+  },
+  appleWebApp: {
+    capable: true,
+    title: APP_NAME,
+    statusBarStyle: "black-translucent" as const,
+  },
+  category: "technology",
+  manifest: "/manifest.webmanifest",
+}
+
+export const viewport = {
+  // Prevents iOS Safari from zooming into form inputs (16 px input rule
+  // is enforced separately via globals.css), while still allowing
+  // pinch-zoom for accessibility (maximumScale=1 would break that).
+  width: "device-width",
+  initialScale: 1,
+  // viewportFit=cover lets us read env(safe-area-inset-*) so the header
+  // dodges the notch and the scroll container clears the home indicator.
+  viewportFit: "cover" as const,
+  // Tints the iOS Safari status bar to match the app shell instead of
+  // showing the white default while the page scrolls.
+  themeColor: [
+    { media: "(prefers-color-scheme: dark)", color: "#0a0a0a" },
+    { media: "(prefers-color-scheme: light)", color: "#ffffff" },
+  ],
+}
 
 const ibmPlexSans = IBM_Plex_Sans({ subsets: ['latin'], variable: '--font-sans', weight: ['300', '400', '500', '600', '700'] })
 
@@ -19,11 +108,14 @@ const fontMono = Geist_Mono({
   variable: "--font-mono",
 })
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode
 }>) {
+  // Touch headers() so Next.js treats this layout as dynamic (otherwise it
+  // gets statically rendered at build time and bakes in old env values).
+  await headers()
   return (
     <html
       lang="en"
@@ -35,51 +127,44 @@ export default function RootLayout({
         ibmPlexSans.variable,
       )}
     >
-      <body className="h-full overflow-hidden bg-background text-foreground">
+      <body className="h-full overflow-hidden overscroll-none bg-background text-foreground">
         <div className="pointer-events-none fixed inset-0 -z-10 overflow-hidden">
-          <GridPattern
+          <AnimatedGridPattern
             width={32}
             height={32}
             x={-1}
             y={-1}
-            className="absolute inset-0 h-full w-full fill-transparent stroke-foreground/[0.04] [mask-image:radial-gradient(ellipse_120%_80%_at_50%_0%,black_30%,transparent_85%)]"
+            numSquares={30}
+            maxOpacity={0.08}
+            duration={3}
+            repeatDelay={0.6}
+            className="absolute inset-0 h-full w-full fill-foreground stroke-foreground/[0.04] [mask-image:radial-gradient(ellipse_120%_80%_at_50%_0%,black_30%,transparent_85%)]"
           />
         </div>
         <Providers>
+          <ExternalServicesProvider
+            urls={{
+              grafana: env.PUBLIC_GRAFANA_URL,
+              prometheus: env.PUBLIC_PROMETHEUS_URL,
+              neo4j: env.PUBLIC_NEO4J_URL,
+            }}
+          >
           <TooltipProvider>
             <ToastProvider>
-              <div className="flex h-svh flex-col overflow-hidden">
+              <div className="flex h-dvh flex-col overflow-hidden">
                 <header
-                  className="z-20 shrink-0 border-b border-border/60 bg-background/95 backdrop-blur-md"
+                  className="z-20 shrink-0 border-b border-border/60 bg-background/95 pt-[env(safe-area-inset-top)] backdrop-blur-md"
                   style={{ viewTransitionName: "header-shell" }}
                 >
-                  <div className="flex h-10 items-center justify-between gap-4 px-6">
-                    <Breadcrumbs />
-                    <div className="flex items-center gap-3">
-                      <div
-                        className="flex items-center gap-2 font-mono text-[11px] text-muted-foreground"
-                        style={{ viewTransitionName: "system-status" }}
-                      >
-                        <span className="relative flex h-2 w-2 shrink-0">
-                          <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-status-healthy opacity-60" />
-                          <span className="relative inline-flex h-2 w-2 rounded-full bg-status-healthy" />
-                        </span>
-                        <span className="uppercase tracking-[0.14em] text-muted-foreground/80">
-                          System Online
-                        </span>
-                      </div>
-                      <ExternalToolsStrip />
-                      {env.DEMO_PASSWORD ? <LogoutButton /> : null}
-                    </div>
-                  </div>
-                  <CoreRouteTabs />
+                  <AuthAwareChrome authEnabled={!!env.DEMO_PASSWORD} />
                 </header>
-                <div className="min-h-0 flex-1 overflow-y-auto overscroll-auto px-6 py-5">
+                <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 pt-4 pb-[max(1rem,env(safe-area-inset-bottom))] sm:px-6 sm:pt-5">
                   {children}
                 </div>
               </div>
             </ToastProvider>
           </TooltipProvider>
+          </ExternalServicesProvider>
         </Providers>
       </body>
     </html>

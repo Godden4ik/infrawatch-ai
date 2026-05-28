@@ -1,0 +1,35 @@
+node_modules
+.next
+.next/cache
+.turbo
+
+# IDE / editor
+.vscode
+.idea
+*.swp
+.DS_Store
+
+# Logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+# Test + coverage
+coverage
+.nyc_output
+
+# Local env (use docker-compose env_file instead)
+.env*
+!.env.example
+
+# Build artifacts
+dist
+out
+
+# Git
+.git
+.gitignore
+
+# Docs / readme don't need to ship in the image
+README.md
+docs

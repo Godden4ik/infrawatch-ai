@@ -1,4 +1,6 @@
-import { EXTERNAL_SERVICES } from "@/lib/external-services";
+"use client";
+
+import { useExternalServices } from "@/lib/external-services-context";
 import {
   Tooltip,
   TooltipContent,
@@ -6,9 +8,10 @@ import {
 } from "@/components/ui/tooltip";
 
 export function ExternalToolsStrip() {
+  const services = useExternalServices();
   return (
     <div className="flex items-center gap-1 border-l border-border/60 pl-3">
-      {EXTERNAL_SERVICES.map((svc) => {
+      {services.map((svc) => {
         const Icon = svc.icon;
         return (
           <Tooltip key={svc.id}>

@@ -27,7 +27,10 @@ import {
   ExternalLink,
 } from "lucide-react";
 import { SiRedis } from "react-icons/si";
-import { EXTERNAL_SERVICES } from "@/lib/external-services";
+import {
+  useExternalServices,
+  type ExternalService,
+} from "@/lib/external-services-context";
 import {
   ServiceDetailSheet,
   type ServiceDetailSheetService,
@@ -161,7 +164,7 @@ function ExternalServiceCard({
   healthVariant,
   onSelect,
 }: {
-  service: (typeof EXTERNAL_SERVICES)[number];
+  service: ExternalService;
   healthVariant: StatusVariant | null;
   onSelect: () => void;
 }) {
@@ -232,6 +235,7 @@ export default function HomePage() {
   const { data: providersData, isLoading: isLoadingProviders } = useQuery(
     providerQueries.list(),
   );
+  const externalServices = useExternalServices();
   const [sqliteKeyIds, setSqliteKeyIds] = useState<Set<string>>(new Set());
   const [sheetOpen, setSheetOpen] = useState(false);
   const [selectedService, setSelectedService] =
@@ -420,7 +424,7 @@ export default function HomePage() {
           Infrastructure Tools
         </p>
         <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
-          {EXTERNAL_SERVICES.map((svc) => {
+          {externalServices.map((svc) => {
             const status = data?.services[svc.id];
             const healthVariant = status ? toVariant(status) : null;
             return (
@@ -435,6 +439,7 @@ export default function HomePage() {
                     type: svc.label,
                     healthVariant: healthVariant ?? "unknown",
                     healthLabel: status ?? "unknown",
+                    externalUrl: svc.url,
                   })
                 }
               />
@@ -450,13 +455,11 @@ export default function HomePage() {
           </p>
           <div className="flex flex-wrap gap-2">
             {providersData.providers.map((provider) => {
-              const configured =
-                !provider.requires_key || sqliteKeyIds.has(provider.id);
-              const healthy = provider.available;
-              const variant: StatusVariant = configured && healthy
-                ? "healthy"
-                : configured
-                  ? "degraded"
+              const hasKey = sqliteKeyIds.has(provider.id);
+              const variant: StatusVariant = !provider.requires_key
+                ? "unknown"
+                : hasKey
+                  ? "healthy"
                   : "unknown";
 
               return (
@@ -466,7 +469,7 @@ export default function HomePage() {
                   </span>
                   {!provider.requires_key
                     ? " · local"
-                    : configured
+                    : hasKey
                       ? " · ready"
                       : " · no key"}
                 </StatusPill>

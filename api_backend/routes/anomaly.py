@@ -83,11 +83,26 @@ async def inject_scenario(scenario: str):
             results_malicious = await _post_injections(client, MALICIOUS_LOG_SEEDS)
             results_reapplied = await _post_injections(client, injections)
 
+    def _enrich(items: list[tuple[str, str]], responses: list) -> list[dict]:
+        # The microservice /inject endpoint echoes {anomaly, status} but
+        # not the service it targeted. Stitch service + anomaly_type back
+        # in so the frontend's Recent Events panel can render rich rows.
+        out: list[dict] = []
+        for (svc, atype), r in zip(items, responses):
+            if isinstance(r, Exception):
+                out.append({"service": svc, "anomaly_type": atype, "error": str(r)})
+            else:
+                payload = r.json()
+                payload["service"] = svc
+                payload["anomaly_type"] = atype
+                out.append(payload)
+        return out
+
     return {
         "scenario": scenario,
-        "results": [r.json() if not isinstance(r, Exception) else str(r) for r in results_primary],
-        "log_seed_results": [r.json() if not isinstance(r, Exception) else str(r) for r in results_malicious],
-        "reapplied_results": [r.json() if not isinstance(r, Exception) else str(r) for r in results_reapplied],
+        "results": _enrich(injections, results_primary),
+        "log_seed_results": _enrich(MALICIOUS_LOG_SEEDS if scenario == "cascade" else [], results_malicious),
+        "reapplied_results": _enrich(injections if scenario == "cascade" else [], results_reapplied),
     }
 
 

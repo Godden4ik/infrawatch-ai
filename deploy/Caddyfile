@@ -1,0 +1,54 @@
+# InfraWatch demo reverse proxy.
+#
+# Cloudflare Tunnel routes four hostnames to this container on port 80;
+# Caddy dispatches by Host header and proxies to the corresponding
+# upstream container.
+#
+# SECURITY NOTE: The three infrastructure tools (Grafana, Prometheus,
+# Neo4j) are exposed publicly without our app-layer gate. They each
+# enforce their own login (or, in Prometheus' case, nothing at all).
+# Tradeoff was chosen to keep the demo UX seamless — clicking the
+# header launcher should not bounce through the demo login again.
+
+{
+	auto_https off
+	admin off
+}
+
+:80 {
+	# ── InfraWatch main UI (gated by Next.js middleware) ───────────────────
+	@infrawatch host {$INFRAWATCH_HOST}
+	handle @infrawatch {
+		reverse_proxy frontend:3000
+	}
+
+	# ── Grafana (admin login is the only gate) ─────────────────────────────
+	@grafana host {$GRAFANA_HOST}
+	handle @grafana {
+		reverse_proxy grafana:3000
+	}
+
+	# ── Prometheus (no auth — read-only PromQL exposed) ────────────────────
+	# Defense in depth: block admin / lifecycle paths even though the
+	# upstream is built without --web.enable-admin-api or
+	# --web.enable-lifecycle, so they return 403/500 anyway. Belt and
+	# suspenders against a future flag flip.
+	@prometheus host {$PROMETHEUS_HOST}
+	handle @prometheus {
+		@prom_admin path /-/reload /-/quit /api/v1/admin/* /api/v1/admin
+		respond @prom_admin 404
+
+		reverse_proxy prometheus:9090
+	}
+
+	# ── Neo4j Browser (neo4j account login is the only gate) ───────────────
+	@neo4j host {$NEO4J_HOST}
+	handle @neo4j {
+		reverse_proxy neo4j:7474
+	}
+
+	# Unknown hostnames → 404
+	handle {
+		respond 404
+	}
+}

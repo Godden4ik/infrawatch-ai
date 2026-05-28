@@ -232,3 +232,50 @@
     animation: none;
   }
 }
+
+/* iOS Safari zooms into any focused input/textarea/select with a
+   font-size < 16px. The monitoring UI uses small font sizes for
+   density, so enforce a 16px minimum on form fields at narrow
+   viewports only — desktop sizing stays unchanged. */
+@media (max-width: 640px) {
+  input,
+  textarea,
+  select {
+    font-size: 16px;
+  }
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
+   Mobile / iOS Safari overscroll + chrome containment
+   ────────────────────────────────────────────────────────────────────────── */
+
+html,
+body {
+  /* Lock html+body so iOS Safari has nothing to rubber-band. The inner
+     scroll container takes over with overscroll-contain. */
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  overscroll-behavior: none;
+  /* Disable iOS pull-to-refresh on the entire document. */
+  -webkit-overflow-scrolling: auto;
+  /* Snappier taps — kill the historic 300 ms click delay. */
+  touch-action: manipulation;
+  /* Stop iOS double-tap zoom on UI elements. */
+}
+
+/* Crisper momentum scroll inside the in-app scroll containers. */
+.overflow-y-auto,
+.overflow-auto {
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Tap highlight is the grey flash iOS draws over any tappable element.
+   We have our own hover / focus states; the default just looks broken. */
+a,
+button,
+[role="button"] {
+  -webkit-tap-highlight-color: transparent;
+}

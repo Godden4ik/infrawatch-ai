@@ -47,7 +47,10 @@ function SheetContent({
   showCloseButton?: boolean
 }) {
   return (
-    <SheetPortal>
+    // keepMounted: keeps the popup in the DOM while closed so the entry
+    // transition fires reliably on the FIRST open. Per base-ui docs:
+    // "Specify keepMounted on the <Portal> part".
+    <SheetPortal keepMounted>
       <SheetOverlay />
       <SheetPrimitive.Popup
         data-slot="sheet-content"
