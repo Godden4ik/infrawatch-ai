@@ -33,7 +33,14 @@ export default function LoginPage() {
         setSubmitting(false);
         return;
       }
-      const dest = params.get("from") || "/";
+      const raw = params.get("from") || "/";
+      // Open-redirect guard: only allow same-origin relative paths.
+      // Reject protocol-relative ("//evil.com"), backslash-prefixed ("/\evil"),
+      // and anything that isn't a simple leading slash.
+      const dest =
+        raw.startsWith("/") && !raw.startsWith("//") && !raw.startsWith("/\\")
+          ? raw
+          : "/";
       router.replace(dest);
       router.refresh();
     } catch (err) {
