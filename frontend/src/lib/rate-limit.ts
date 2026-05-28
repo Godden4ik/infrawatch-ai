@@ -18,13 +18,13 @@ interface Bucket {
 
 const buckets = new Map<string, Bucket>();
 
-const MAX_ATTEMPTS = 5;
+const MAX_ATTEMPTS = 20;
 const WINDOW_MS = 15 * 60 * 1000; // 15 min
 const MAX_BUCKETS = 10_000;
 
 // Global backstop against IP-rotation attacks (e.g. spoofed
 // X-Forwarded-For, botnets). Caps total attempts across ALL identifiers.
-const GLOBAL_MAX_ATTEMPTS = 200;
+const GLOBAL_MAX_ATTEMPTS = 2_000;
 let globalCounter: Bucket = { count: 0, resetAt: 0 };
 
 export interface RateLimitResult {
@@ -95,19 +95,26 @@ export function checkLoginRateLimit(key: string): RateLimitResult {
 /**
  * Extract a client identifier suitable for rate limiting.
  *
- * Trust order:
- *   1. `x-vercel-forwarded-for` — set by Vercel's edge proxy, NOT
- *      copied from client-supplied headers. Cannot be spoofed.
- *   2. `x-real-ip` — most reverse proxies set this server-side after
+ * Trust order (each header below is set server-side by a trusted
+ * proxy and cannot be spoofed by clients):
+ *   1. `cf-connecting-ip` — Cloudflare edge writes the real visitor
+ *      IP here. Cloudflare strips any client-supplied value of this
+ *      header before adding its own. This is the authoritative source
+ *      when fronted by Cloudflare (Tunnel or proxied DNS).
+ *   2. `x-vercel-forwarded-for` — Vercel edge equivalent.
+ *   3. `x-real-ip` — most reverse proxies set this server-side after
  *      stripping any client-supplied value.
- *   3. `x-forwarded-for` — last resort; clients CAN set this directly,
- *      but the global counter in checkLoginRateLimit() caps damage.
+ *   4. `x-forwarded-for` — last resort; clients CAN set this directly
+ *      end-to-end, but the global counter in checkLoginRateLimit()
+ *      caps damage from header spoofing.
  *
- * If you front this app with a custom proxy other than Vercel's edge,
- * configure that proxy to strip the client-supplied X-Forwarded-For
- * before it reaches Next.js.
+ * If you front this app with a custom proxy other than Cloudflare /
+ * Vercel, configure that proxy to strip client-supplied
+ * X-Forwarded-For before it reaches Next.js.
  */
 export function clientIp(req: Request): string {
+  const cfIp = req.headers.get("cf-connecting-ip");
+  if (cfIp) return cfIp.trim();
   const vercelIp = req.headers.get("x-vercel-forwarded-for");
   if (vercelIp) return vercelIp.split(",")[0]!.trim();
   const realIp = req.headers.get("x-real-ip");

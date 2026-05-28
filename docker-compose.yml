@@ -133,11 +133,12 @@ services:
       - DEMO_PASSWORD=${DEMO_PASSWORD:-}
       - SESSION_SECRET=${SESSION_SECRET:-}
       # Public URLs surfaced by the header launcher strip when the demo
-      # is hosted. Defaults are localhost (no override → strip falls back
-      # via env.ts defaults).
-      - NEXT_PUBLIC_GRAFANA_URL=${PUBLIC_GRAFANA_URL:-http://localhost:3000}
-      - NEXT_PUBLIC_PROMETHEUS_URL=${PUBLIC_PROMETHEUS_URL:-http://localhost:9090}
-      - NEXT_PUBLIC_NEO4J_URL=${PUBLIC_NEO4J_URL:-http://localhost:7474}
+      # is hosted. Read server-side at request time and threaded through
+      # a Context so a value change here applies on container restart —
+      # no rebuild needed (unlike NEXT_PUBLIC_* which gets baked in).
+      - PUBLIC_GRAFANA_URL=${PUBLIC_GRAFANA_URL:-http://localhost:3000}
+      - PUBLIC_PROMETHEUS_URL=${PUBLIC_PROMETHEUS_URL:-http://localhost:9090}
+      - PUBLIC_NEO4J_URL=${PUBLIC_NEO4J_URL:-http://localhost:7474}
     networks:
       - infrawatch
     depends_on:

@@ -1,38 +1,38 @@
 import { SiPrometheus, SiGrafana, SiNeo4J } from "react-icons/si";
 import type { IconType } from "react-icons";
-import { env } from "@/env";
 
-export type ExternalService = {
-  id: string;
+export type ExternalServiceId = "grafana" | "prometheus" | "neo4j";
+
+export type ExternalServiceMeta = {
+  id: ExternalServiceId;
   label: string;
-  url: string;
   icon: IconType;
   description: string;
 };
 
-export const EXTERNAL_SERVICES: ExternalService[] = [
+/**
+ * Static metadata. URLs intentionally not embedded here — they're read
+ * server-side at request time (env.PUBLIC_*_URL) and threaded through
+ * the ExternalServicesProvider so a .env change applies without
+ * rebuilding the frontend bundle.
+ */
+export const EXTERNAL_SERVICES_META: ExternalServiceMeta[] = [
   {
     id: "grafana",
     label: "Grafana",
-    url: env.NEXT_PUBLIC_GRAFANA_URL,
     icon: SiGrafana,
     description: "Dashboards & alerting",
   },
   {
     id: "prometheus",
     label: "Prometheus",
-    url: env.NEXT_PUBLIC_PROMETHEUS_URL,
     icon: SiPrometheus,
     description: "Metrics & queries",
   },
   {
     id: "neo4j",
     label: "Neo4j",
-    url: env.NEXT_PUBLIC_NEO4J_URL,
     icon: SiNeo4J,
     description: "Graph browser",
   },
 ];
-
-export const EXTERNAL_SERVICE_BY_ID: Record<string, ExternalService> =
-  Object.fromEntries(EXTERNAL_SERVICES.map((s) => [s.id, s]));
