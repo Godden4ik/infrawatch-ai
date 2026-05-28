@@ -1,7 +1,7 @@
 "use client";
 
 import { Suspense, useState, type FormEvent } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { KeyRound, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -16,7 +16,6 @@ export default function LoginPage() {
 }
 
 function LoginForm() {
-  const router = useRouter();
   const params = useSearchParams();
   const [password, setPassword] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -49,8 +48,11 @@ function LoginForm() {
         raw.startsWith("/") && !raw.startsWith("//") && !raw.startsWith("/\\")
           ? raw
           : "/";
-      router.replace(dest);
-      router.refresh();
+      // Hard navigation — router.replace() + refresh() races with the
+      // App Router cache, which may already hold the pre-login redirect
+      // response for `dest`. window.location forces a fresh request
+      // that carries the just-set auth cookie.
+      window.location.assign(dest);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Network error.");
       setSubmitting(false);
