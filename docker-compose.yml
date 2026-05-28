@@ -129,6 +129,9 @@ services:
     environment:
       - API_BACKEND_URL=http://api-backend:8090
       - PROMETHEUS_URL=http://prometheus:9090
+      # Shared-password gate for hosted demos. Set both in .env to enable.
+      - DEMO_PASSWORD=${DEMO_PASSWORD:-}
+      - SESSION_SECRET=${SESSION_SECRET:-}
     networks:
       - infrawatch
     depends_on:
