@@ -192,6 +192,7 @@ export function ServiceDetailSheet({
             </p>
             <div className="grid gap-2">
               <Button
+                nativeButton={false}
                 render={
                   <Link href="/topology">
                     <Network className="h-3.5 w-3.5" />
@@ -200,6 +201,7 @@ export function ServiceDetailSheet({
                 }
               />
               <Button
+                nativeButton={false}
                 variant="outline"
                 render={
                   <Link href="/dashboard">
@@ -209,6 +211,7 @@ export function ServiceDetailSheet({
                 }
               />
               <Button
+                nativeButton={false}
                 variant="outline"
                 render={
                   <Link href="/anomaly">
