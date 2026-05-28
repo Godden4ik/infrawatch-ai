@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { env } from "@/env";
-import { issueAuthToken, timingSafeEqual } from "@/lib/auth-token";
+import { issueAuthToken, timingSafeCompareHashed } from "@/lib/auth-token";
 import { checkLoginRateLimit, clientIp } from "@/lib/rate-limit";
 
 const COOKIE_NAME = "demo_auth";
@@ -47,8 +47,10 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Invalid body." }, { status: 400 });
   }
 
-  // Constant-time compare to avoid leaking password length / prefix.
-  if (!timingSafeEqual(password, expected)) {
+  // Length-independent compare: HMAC both inputs with the server secret
+  // and compare the resulting equal-length digests. Neither the length
+  // nor the prefix of the expected password leaks through timing.
+  if (!(await timingSafeCompareHashed(password, expected, secret))) {
     return NextResponse.json(
       { error: "Incorrect password." },
       { status: 401 },

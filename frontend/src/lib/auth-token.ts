@@ -29,14 +29,42 @@ async function hmacSha256Hex(payload: string, secret: string): Promise<string> {
     .join("");
 }
 
-/** Constant-time string compare. */
+/**
+ * Constant-time string compare.
+ *
+ * Iterates a fixed minimum length regardless of input lengths, and folds
+ * the length difference itself into the diff, so the runtime and branch
+ * pattern are independent of either operand's length. Safe to call with
+ * attacker-controlled `a` against server-side `b`.
+ */
 export function timingSafeEqual(a: string, b: string): boolean {
-  if (a.length !== b.length) return false;
-  let diff = 0;
-  for (let i = 0; i < a.length; i++) {
-    diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  const FIXED_MIN = 64;
+  const len = Math.max(a.length, b.length, FIXED_MIN);
+  let diff = a.length ^ b.length;
+  for (let i = 0; i < len; i++) {
+    const ac = i < a.length ? a.charCodeAt(i) : 0;
+    const bc = i < b.length ? b.charCodeAt(i) : 0;
+    diff |= ac ^ bc;
   }
   return diff === 0;
+}
+
+/**
+ * Length-independent password comparison. HMACs both inputs with the
+ * server secret so the comparison happens between two equal-length
+ * (64-hex-char) digests. Neither length nor prefix of the expected
+ * password leaks to the caller.
+ */
+export async function timingSafeCompareHashed(
+  a: string,
+  b: string,
+  secret: string,
+): Promise<boolean> {
+  const [aMac, bMac] = await Promise.all([
+    hmacSha256Hex(a, secret),
+    hmacSha256Hex(b, secret),
+  ]);
+  return timingSafeEqual(aMac, bMac);
 }
 
 export async function issueAuthToken(secret: string): Promise<string> {
@@ -63,5 +91,7 @@ export async function verifyAuthToken(
   if (Date.now() - issuedAtNum > TOKEN_TTL_MS) return false;
 
   const expected = await hmacSha256Hex(issuedAt, secret);
+  // Both `mac` and `expected` are 64-hex-char strings from sha256 — no
+  // length leak risk; this `timingSafeEqual` is safe here.
   return timingSafeEqual(mac, expected);
 }
