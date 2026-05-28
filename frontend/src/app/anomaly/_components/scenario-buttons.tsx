@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Flame, Loader2, RotateCcw, Workflow } from "lucide-react";
 import { injectScenario, resetAnomalies } from "@/services/anomaly/actions";
@@ -18,6 +19,7 @@ import {
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
+import { SampleWaitIndicator } from "./sample-wait-indicator";
 import type {
   ActiveInjection,
   InjectResponse,
@@ -39,6 +41,7 @@ export function ScenarioButtons({
   onScenarioInjected,
 }: ScenarioButtonsProps) {
   const queryClient = useQueryClient();
+  const [waitStartedAt, setWaitStartedAt] = useState<number | null>(null);
 
   const cascadeMutation = useMutation({
     mutationFn: async () => {
@@ -54,7 +57,8 @@ export function ScenarioButtons({
     onSuccess: (data) => {
       void queryClient.invalidateQueries({ queryKey: healthKeys.all });
       void queryClient.invalidateQueries({ queryKey: anomalyKeys.status() });
-      toast.success("Cascade scenario accepted.");
+      toast.success("Cascade scenario accepted. Charts reflect change after the next Prometheus scrape (~5–15 s).");
+      setWaitStartedAt(Date.now());
 
       const events =
         data.results
@@ -170,6 +174,8 @@ export function ScenarioButtons({
             )}
             Inject cascade
           </Button>
+
+          <SampleWaitIndicator startedAt={waitStartedAt} />
         </div>
 
         <Separator />
