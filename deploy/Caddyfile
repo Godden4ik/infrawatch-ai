@@ -1,52 +1,42 @@
 # InfraWatch demo reverse proxy.
 #
 # Cloudflare Tunnel routes four hostnames to this container on port 80;
-# Caddy dispatches by Host header. The three infrastructure tools are
-# gated by an explicit reverse_proxy to /api/auth-check that traps the
-# 401 with handle_response and redirects to /login.
+# Caddy dispatches by Host header and proxies to the corresponding
+# upstream container.
+#
+# SECURITY NOTE: The three infrastructure tools (Grafana, Prometheus,
+# Neo4j) are exposed publicly without our app-layer gate. They each
+# enforce their own login (or, in Prometheus' case, nothing at all).
+# Tradeoff was chosen to keep the demo UX seamless — clicking the
+# header launcher should not bounce through the demo login again.
 
 {
 	auto_https off
 	admin off
 }
 
-(auth_gate) {
-	reverse_proxy frontend:3000 {
-		method GET
-		rewrite /api/auth-check
-
-		@denied status 401
-		handle_response @denied {
-			redir https://{$INFRAWATCH_HOST}/login 302
-		}
-	}
-}
-
 :80 {
-	# ── InfraWatch main UI ─────────────────────────────────────────────────
+	# ── InfraWatch main UI (gated by Next.js middleware) ───────────────────
 	@infrawatch host {$INFRAWATCH_HOST}
 	handle @infrawatch {
 		reverse_proxy frontend:3000
 	}
 
-	# ── Grafana ────────────────────────────────────────────────────────────
+	# ── Grafana (admin login is the only gate) ─────────────────────────────
 	@grafana host {$GRAFANA_HOST}
 	handle @grafana {
-		import auth_gate
 		reverse_proxy grafana:3000
 	}
 
-	# ── Prometheus ─────────────────────────────────────────────────────────
+	# ── Prometheus (no auth — read-only PromQL exposed) ────────────────────
 	@prometheus host {$PROMETHEUS_HOST}
 	handle @prometheus {
-		import auth_gate
 		reverse_proxy prometheus:9090
 	}
 
-	# ── Neo4j Browser ──────────────────────────────────────────────────────
+	# ── Neo4j Browser (neo4j account login is the only gate) ───────────────
 	@neo4j host {$NEO4J_HOST}
 	handle @neo4j {
-		import auth_gate
 		reverse_proxy neo4j:7474
 	}
 
